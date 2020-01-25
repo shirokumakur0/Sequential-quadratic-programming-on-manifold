@@ -148,11 +148,17 @@ function [x, cost, info, options] = sqponmani(problem, x0, options)
     localdefaults.tolgradnorm = 1e-6;
     localdefaults.ls_max_steps  = 25;
     localdefaults.storedepth = 30;
-    localdefaults.linesearch = @linesearch_hint;
     localdefaults.tau = 0.8;  % TODO: should find an appropriate value as long as tau > 0
     localdefaults.rho = 1;  % TODO: should find an appropriate value as long as rho > 0
     localdefaults.beta = 0.5;  % TODO: should find an appropriate value as long as 1 > beta > 0
     localdefaults.gamma = 0.5; % TODO: should find an appropriate value as long as 1 > gamma > 0  
+
+    % TODO: reconsider below. is this if-else part needed?
+    if ~canGetLinesearch(problem)
+        localdefaults.linesearch = @linesearch;
+    else
+        localdefaults.linesearch = @linesearch_hint;
+    end
     
     % Merge global and local defaults, then merge w/ user options, if any.
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
@@ -169,10 +175,7 @@ function [x, cost, info, options] = sqponmani(problem, x0, options)
     else
         xCur = x0;
     end
-    
-    timetic = tic();
-    
-    % TODO:storeDB??????????????????
+        
     % Create a store database and get a key for the current x
     storedb = StoreDB(options.storedepth);
     key = storedb.getNewKey();
@@ -183,17 +186,34 @@ function [x, cost, info, options] = sqponmani(problem, x0, options)
     rho = options.rho;
     beta = options.beta;
     gamma = options.gamma;
+
+    timetic = tic();
     
-    % Initialization of variables
+    % __Initialization of variables__
     % Number of iterations since the last restart
     k = 0;  
     % Total number of SQP iterations
     iter = 0;
+    % Norm of the step
+    stepsize = 1;
+    % Line-search stastics for recording in info
+    lsstats = [];
     
+    % Save stats in a struct array info, and preallocate.
+    stats = savestats();
+    info(1) = stats;
+    info(min(10000, options.maxiter+1)).iter = [];
+    
+    if options.verbosity >= 2
+        fprintf(' iter                   cost val            grad. norm           alpha\n');
+    end
+    
+    timetic = tic();
+
     % Get current Hessian and gradient of the cost function
     fprintf('Iteration: %d     ', iter);
-    costfun = @(X) costLagrangian(X, problem0, rho, lambdas, gammas);
-    gradfun = @(X) gradLagrangian(X, problem0, rho, lambdas, gammas);
+    costfun = @(X) costLagrangian(X, problem0, mus, lambdas);
+    gradfun = @(X) gradLagrangian(X, problem0, mus, lambdas);
     problem.cost = costfun;
     problem.grad = gradfun;
     problem.M = M;
@@ -215,51 +235,96 @@ function [x, cost, info, options] = sqponmani(problem, x0, options)
     % Update variables to new iterate
     
     % costLagrangian???verify????????????????
-    function val = costLagrangian(x, problem, mus, lambdas)
-        val = getCost(problem, x);
-        if condet.has_ineq_cost
-            for numineq = 1: condet.n_ineq_constraint_cost
-                costhandle = problem.ineq_constraint_cost{numineq};
-                cost_numineq = costhandle(x) % ???????
-                val = val + mus(numineq) * cost_numineq;
-            end
+    
+    % Routine in charge of collecting the current iteration stats
+    function stats = savestats()
+        stats.iter = iter;
+        stats.cost = xCurCost;
+        stats.gradnorm = xCurGradNorm;
+        if iter == 0
+            stats.stepsize = NaN;
+            stats.time = toc(timetic);
+        else
+            stats.stepsize = stepsize;
+            stats.time = info(iter).time + toc(timetic);
         end
-        
-        if condet.has_eq_cost
-            for numeq = 1: condet.n_eq_constraint_cost
-                costhandle = problem.eq_constraint_cost{numeq};
-                cost_numeq = costhandle(x);
-                val = val + lambdas(numeq) * cost_numeq;
-            end
-        end
+        stats.linesearch = lsstats;
+        stats = applyStatsfun(problem, xCur, storedb, key, options, stats);
     end
-
-    % gradLagrangian ???????????????
-    function val = gradLagrangian(x, problem, rho, lambdas, gammas)
-        val = getGradient(problem, x);
-        if condet.has_ineq_cost
-            for numineq = 1: condet.n_ineq_constraint_cost
-                costhandle = problem.ineq_constraint_cost{numineq};
-                cost_numineq = costhandle(x);
-                if (cost_numineq + lambdas(numineq)/rho > 0)
-                    gradhandle = problem.ineq_constraint_grad{numineq};
-                    constraint_grad = gradhandle(x);
-                    constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-                    val = problem.M.lincomb(x, 1, val, cost_numineq * rho + lambdas(numineq), constraint_grad);
-                end
-            end
-        end
-        
-        if condet.has_eq_cost
-            for numeq = 1:condet.n_eq_constraint_cost
-                costhandle = problem.eq_constraint_cost{numeq};
-                cost_numeq = costhandle(x);
-                gradhandle = problem.eq_constraint_grad{numeq};
-                constraint_grad = gradhandle(x);
-                constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-                val = problem.M.lincomb(x, 1, val, cost_numeq * rho + gammas(numeq), constraint_grad);
-            end
-        end
-    end
-
 end
+
+
+function val = costLagrangian(x, problem, mus, lambdas)
+    val = getCost(problem, x);
+    if condet.has_ineq_cost
+        for numineq = 1: condet.n_ineq_constraint_cost
+            costhandle = problem.ineq_constraint_cost{numineq};
+            cost_numineq = costhandle(x)
+            val = val + mus(numineq) * cost_numineq;
+        end
+    end
+
+    if condet.has_eq_cost
+        for numeq = 1: condet.n_eq_constraint_cost
+            costhandle = problem.eq_constraint_cost{numeq};
+            cost_numeq = costhandle(x);
+            val = val + lambdas(numeq) * cost_numeq;
+        end
+    end
+end
+
+
+function val = gradLagrangian(x, problem, mus, lambdas)
+    val = getGradient(problem, x);
+    if condet.has_ineq_cost
+        for numineq = 1: condet.n_ineq_constraint_cost
+            % costhandle = problem.ineq_constraint_cost{numineq};
+            % cost_numineq = costhandle(x);
+            gradhandle = problem.ineq_constraint_grad{numineq};
+            constraint_grad = gradhandle(x);
+            constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
+            val = problem.M.lincomb(x, 1, val, mus(numineq), constraint_grad);
+        end
+    end
+
+    if condet.has_eq_cost
+        for numeq = 1:condet.n_eq_constraint_cost
+            % costhandle = problem.eq_constraint_cost{numeq};
+            % cost_numeq = costhandle(x);
+            gradhandle = problem.eq_constraint_grad{numeq};
+            constraint_grad = gradhandle(x);
+            constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
+            val = problem.M.lincomb(x, 1, val, lambdas(numeq), constraint_grad);
+        end
+    end
+end
+
+
+% TODO: uncomplete, to use hessianmatrix, write the alg. for making normal
+% basis.
+function val = hessMatLagrangian(x, problem, mus, lambdas)
+    
+    val = getHessian(problem, x);
+    if condet.has_ineq_cost
+        for numineq = 1: condet.n_ineq_constraint_cost
+            % costhandle = problem.ineq_constraint_cost{numineq};
+            % cost_numineq = costhandle(x);
+            gradhandle = problem.ineq_constraint_grad{numineq};
+            constraint_grad = gradhandle(x);
+            constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
+            val = problem.M.lincomb(x, 1, val, mus(numineq), constraint_grad);
+        end
+    end
+
+    if condet.has_eq_cost
+        for numeq = 1:condet.n_eq_constraint_cost
+            % costhandle = problem.eq_constraint_cost{numeq};
+            % cost_numeq = costhandle(x);
+            gradhandle = problem.eq_constraint_grad{numeq};
+            constraint_grad = gradhandle(x);
+            constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
+            val = problem.M.lincomb(x, 1, val, lambdas(numeq), constraint_grad);
+        end
+    end
+end
+
