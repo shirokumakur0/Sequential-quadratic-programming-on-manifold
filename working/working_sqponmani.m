@@ -1,11 +1,11 @@
-function [x, cost, info, options] = sqponmani(problem, x0, options)
+function [x, cost, info, options] = sqponmani(problem0, x0, options)
 % Sequential Quadratic Programming solver for smooth objective functions 
 % on Riemannian manifolds.
 %
-% function [x, cost, info, options] = sqponmani(problem)
-% function [x, cost, info, options] = sqponmani(problem, x0)
-% function [x, cost, info, options] = sqponmani(problem, x0, options)
-% function [x, cost, info, options] = sqponmani(problem, [], options)
+% function [x, cost, info, options] = sqponmani(problem0)
+% function [x, cost, info, options] = sqponmani(problem0, x0)
+% function [x, cost, info, options] = sqponmani(problem0, x0, options)
+% function [x, cost, info, options] = sqponmani(problem0, [], options)
 %
 % This is a Sequential Qudratic Programming solver for mixed constraints problems
 % on Riemannian manifolds, which aims to minimize the cost function
@@ -127,11 +127,11 @@ function [x, cost, info, options] = sqponmani(problem, x0, options)
 
 
     % Verify that the problem description is sufficient for the solver.
-    if ~canGetCost(problem)
+    if ~canGetCost(problem0)
         warning('manopt:getCost', ...
             'No cost provided. The algorithm will likely abort.');
     end
-    if ~canGetGradient(problem) && ~canGetApproxGradient(problem)
+    if ~canGetGradient(problem0) && ~canGetApproxGradient(problem0)
         % Note: we do not give a warning if an approximate gradient is
         % explicitly given in the problem description, as in that case the user
         % seems to be aware of the issue.
@@ -139,7 +139,7 @@ function [x, cost, info, options] = sqponmani(problem, x0, options)
            ['No gradient provided. Using an FD approximation instead (slow).\n' ...
             'It may be necessary to increase options.tolgradnorm.\n' ...
             'To disable this warning: warning(''off'', ''manopt:getGradient:approx'')']);
-        problem.approxgrad = approxgradientFD(problem);
+        problem0.approxgrad = approxgradientFD(problem0);
     end
     
     % Local defaults for the program
@@ -154,7 +154,7 @@ function [x, cost, info, options] = sqponmani(problem, x0, options)
     localdefaults.gamma = 0.5; % TODO: should find an appropriate value as long as 1 > gamma > 0  
 
     % TODO: reconsider below. is this if-else part needed?
-    if ~canGetLinesearch(problem)
+    if ~canGetLinesearch(problem0)
         localdefaults.linesearch = @linesearch;
     else
         localdefaults.linesearch = @linesearch_hint;
@@ -167,21 +167,34 @@ function [x, cost, info, options] = sqponmani(problem, x0, options)
     end
     options = mergeOptions(localdefaults, options);
     
-    M = problem.M;
-    
     % Create a random starting point if no starting point is provided.
     if ~exist('x0', 'var')|| isempty(x0)
         xCur = M.rand(); 
     else
         xCur = x0;
     end
-        
+    
+    % Create basis of tangent spaces. Here we assume that the tangent spaces
+    % of M have the same basis as that of M. At least, this seems to be true
+    % when M is embedded in some Euclidean space unless factories in Manopt
+    % haven't changed after Jan. 27, 2020, i.e., both M and the tangent spaces
+    % use the canonical basis,  Yet, we should consider the consistency when
+    % applying this method to some M, respectively. This part is an uncomplete
+    % if we launch this algorithm, officialy.
+    n = problem0.M.dim();
+    basis = cell(n,1);
+    for k=1:n
+        vec = zeros(n,1);
+        vec(k) = 1;
+        basis{k} = vec;
+    end
+    
     % Create a store database and get a key for the current x
     storedb = StoreDB(options.storedepth);
     key = storedb.getNewKey();
     
     % Rename
-    M = problem.M;
+    M = problem0.M;
     tau = options.tau;
     rho = options.rho;
     beta = options.beta;
@@ -212,17 +225,25 @@ function [x, cost, info, options] = sqponmani(problem, x0, options)
 
     % Get current Hessian and gradient of the cost function
     fprintf('Iteration: %d     ', iter);
-    costfun = @(X) costLagrangian(X, problem0, mus, lambdas);
-    gradfun = @(X) gradLagrangian(X, problem0, mus, lambdas);
-    problem.cost = costfun;
-    problem.grad = gradfun;
+    costLag = @(X) costLagrangian(X, problem0, mus, lambdas);
+    gradLag = @(X) gradLagrangian(X, problem0, mus, lambdas);
+    problem.cost = costLag;
+    problem.grad = gradLag;
     problem.M = M;
+    
+    gradLagvec = gradMetricVectorize(xCur, gradLag, problem, basis);
+    hessLagmat = hessMatLagrangian(xCur, problem, basis);
+    
+    %%%%%% WRTOE HERE%%%%%
+    
+    [ineqconst_gradmat, eqconst_gradmat] = gradConstraintMatrix(xCur, problem0, basis);
+    
     inneroptions.tolgradnorm = tolgradnorm;
     inneroptions.verbosity = 0;
     inneroptions.maxiter = options.maxInnerIter;
     inneroptions.minstepsize = options.minstepsize;
          
-    [xCur, cost, innerinfo, Oldinneroptions] = quadprog(problem, xCur, inneroptions);
+    [xCur, cost, innerinfo, Oldinneroptions] = quadprog(problem0, xCur, inneroptions);
     
     % Tailor the quadratic model of the Lagrangian and linearized constraints 
     % to meet the subproblem, a quadratic programming; QP, at the current point
@@ -233,10 +254,9 @@ function [x, cost, info, options] = sqponmani(problem, x0, options)
     % rule
     
     % Update variables to new iterate
-    
-    % costLagrangian???verify????????????????
-    
+        
     % Routine in charge of collecting the current iteration stats
+
     function stats = savestats()
         stats.iter = iter;
         stats.cost = xCurCost;
@@ -249,16 +269,18 @@ function [x, cost, info, options] = sqponmani(problem, x0, options)
             stats.time = info(iter).time + toc(timetic);
         end
         stats.linesearch = lsstats;
-        stats = applyStatsfun(problem, xCur, storedb, key, options, stats);
+        stats = applyStatsfun(problem0, xCur, storedb, key, options, stats);
     end
 end
 
 
-function val = costLagrangian(x, problem, mus, lambdas)
-    val = getCost(problem, x);
+
+
+function val = costLagrangian(x, problem0, mus, lambdas)
+    val = getCost(problem0, x);
     if condet.has_ineq_cost
         for numineq = 1: condet.n_ineq_constraint_cost
-            costhandle = problem.ineq_constraint_cost{numineq};
+            costhandle = problem0.ineq_constraint_cost{numineq};
             cost_numineq = costhandle(x)
             val = val + mus(numineq) * cost_numineq;
         end
@@ -266,7 +288,7 @@ function val = costLagrangian(x, problem, mus, lambdas)
 
     if condet.has_eq_cost
         for numeq = 1: condet.n_eq_constraint_cost
-            costhandle = problem.eq_constraint_cost{numeq};
+            costhandle = problem0.eq_constraint_cost{numeq};
             cost_numeq = costhandle(x);
             val = val + lambdas(numeq) * cost_numeq;
         end
@@ -274,16 +296,16 @@ function val = costLagrangian(x, problem, mus, lambdas)
 end
 
 
-function val = gradLagrangian(x, problem, mus, lambdas)
-    val = getGradient(problem, x);
+function val = gradLagrangian(x, problem0, mus, lambdas)
+    val = getGradient(problem0, x);
     if condet.has_ineq_cost
         for numineq = 1: condet.n_ineq_constraint_cost
             % costhandle = problem.ineq_constraint_cost{numineq};
             % cost_numineq = costhandle(x);
-            gradhandle = problem.ineq_constraint_grad{numineq};
+            gradhandle = problem0.ineq_constraint_grad{numineq};
             constraint_grad = gradhandle(x);
-            constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-            val = problem.M.lincomb(x, 1, val, mus(numineq), constraint_grad);
+            constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
+            val = problem0.M.lincomb(x, 1, val, mus(numineq), constraint_grad);
         end
     end
 
@@ -291,40 +313,25 @@ function val = gradLagrangian(x, problem, mus, lambdas)
         for numeq = 1:condet.n_eq_constraint_cost
             % costhandle = problem.eq_constraint_cost{numeq};
             % cost_numeq = costhandle(x);
-            gradhandle = problem.eq_constraint_grad{numeq};
+            gradhandle = problem0.eq_constraint_grad{numeq};
             constraint_grad = gradhandle(x);
-            constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-            val = problem.M.lincomb(x, 1, val, lambdas(numeq), constraint_grad);
+            constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
+            val = problem0.M.lincomb(x, 1, val, lambdas(numeq), constraint_grad);
         end
     end
 end
 
-
-% TODO: uncomplete, to use hessianmatrix, write the alg. for making normal
-% basis.
-function val = hessMatLagrangian(x, problem, mus, lambdas)
-    
-    val = getHessian(problem, x);
-    if condet.has_ineq_cost
-        for numineq = 1: condet.n_ineq_constraint_cost
-            % costhandle = problem.ineq_constraint_cost{numineq};
-            % cost_numineq = costhandle(x);
-            gradhandle = problem.ineq_constraint_grad{numineq};
-            constraint_grad = gradhandle(x);
-            constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-            val = problem.M.lincomb(x, 1, val, mus(numineq), constraint_grad);
-        end
-    end
-
-    if condet.has_eq_cost
-        for numeq = 1:condet.n_eq_constraint_cost
-            % costhandle = problem.eq_constraint_cost{numeq};
-            % cost_numeq = costhandle(x);
-            gradhandle = problem.eq_constraint_grad{numeq};
-            constraint_grad = gradhandle(x);
-            constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-            val = problem.M.lincomb(x, 1, val, lambdas(numeq), constraint_grad);
-        end
+function gradmetvec = gradMetricVectorize(x, grad, problem, basis)
+    n = numel(basis); 
+    gradmetvec = zeros(n);
+    for i = 1 : n
+            gradmetvec(i) = problem.M.inner(x, grad, basis{i});
     end
 end
+
+
+function hessLagmat = hessMatLagrangian(x, problem, basis)
+    [hessLagmat, ~] = hessianmatrix(problem, x, basis);
+end
+
 
