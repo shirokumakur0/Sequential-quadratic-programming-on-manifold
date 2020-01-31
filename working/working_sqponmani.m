@@ -117,14 +117,13 @@ function [x, cost, info, options] = sqponmani(problem0, x0, options)
 %   doi       = {}
 % }
 %
-
+%
 % Original author: Mitsuaki Obara, January 20, 2020.
 % Contributors: 
 % Change log: 
 %           January, 20, 2020: forked from Changshuo Liu's rlbfgs.m
 %           deleted codes on localdefaults.tolgradnorm and 
 %           localdefaults.strict_inc_func 
-
 
     % Verify that the problem description is sufficient for the solver.
     if ~canGetCost(problem0)
@@ -152,7 +151,9 @@ function [x, cost, info, options] = sqponmani(problem0, x0, options)
     localdefaults.rho = 1;  % TODO: should find an appropriate value as long as rho > 0
     localdefaults.beta = 0.5;  % TODO: should find an appropriate value as long as 1 > beta > 0
     localdefaults.gamma = 0.5; % TODO: should find an appropriate value as long as 1 > gamma > 0  
-
+    localdefaults.mus = ones(problem0.condet.n_ineq_constraint_cost, 1);
+    localdefaults.lambdas = ones(problem0.condet.n_eq_constraint_cost, 1);    
+    
     % TODO: reconsider below. is this if-else part needed?
     if ~canGetLinesearch(problem0)
         localdefaults.linesearch = @linesearch;
@@ -169,36 +170,33 @@ function [x, cost, info, options] = sqponmani(problem0, x0, options)
     
     % Create a random starting point if no starting point is provided.
     if ~exist('x0', 'var')|| isempty(x0)
-        xCur = M.rand(); 
+        xCur = pronlem0.M.rand(); 
     else
         xCur = x0;
     end
     
-    % Create basis of tangent spaces. Here we assume that the tangent spaces
-    % of M have the same basis as that of M. At least, this seems to be true
-    % when M is embedded in some Euclidean space unless factories in Manopt
-    % haven't changed after Jan. 27, 2020, i.e., both M and the tangent spaces
-    % use the canonical basis,  Yet, we should consider the consistency when
-    % applying this method to some M, respectively. This part is an uncomplete
-    % if we launch this algorithm, officialy.
-    n = problem0.M.dim();
-    basis = cell(n,1);
-    for k=1:n
-        vec = zeros(n,1);
-        vec(k) = 1;
-        basis{k} = vec;
-    end
+    % Up to  here, the codes are borrowed from manopt. Now, we added the following
+    % ones for SQP on manifolds.
     
+    % Get the canonical basis corresponding with the manifold. We use this
+    % for vectorizing gradients and make Hessianmatrix, both of which are
+    % applied with Riemannian metrics.
+    % NOTICE: The function only assume the case that the tangent spaces
+    % of M have the same basis as that of M because this is a prototyping
+    % vesion. For more detail, please check makeCanonicalBasis.m.
+    basis = makeCanonicalBasis(problem0);
+  
     % Create a store database and get a key for the current x
     storedb = StoreDB(options.storedepth);
     key = storedb.getNewKey();
     
     % Rename
     M = problem0.M;
-    tau = options.tau;
+    % condet = problem0.condet; % NOTICE: this is different from 
+    % other algorithms since others don't require that problem0 has condet.
     rho = options.rho;
-    beta = options.beta;
-    gamma = options.gamma;
+    mus = options.mus;
+    lambdas = options.lambdas;
 
     timetic = tic();
     
@@ -223,40 +221,61 @@ function [x, cost, info, options] = sqponmani(problem0, x0, options)
     
     timetic = tic();
 
-    % Get current Hessian and gradient of the cost function
+    % Get current Hessian and gradient of the cost function.
+    % Also, make a "problem" structure which expresses the subproblem at the
+    % current point.
     fprintf('Iteration: %d     ', iter);
-    costLag = @(X) costLagrangian(X, problem0, mus, lambdas);
-    gradLag = @(X) gradLagrangian(X, problem0, mus, lambdas);
+    costLag = @(X) costLagrangian(X, problem0, mus, lambdas); % value
+    gradLag = @(X) gradLagrangian(X, problem0, mus, lambdas); % in the tangent space
+    hessLag = @(X, d) hessLagrangian(X, d, problem0, mus, lambdas); % in the tangent space
     problem.cost = costLag;
     problem.grad = gradLag;
+    problem.hess = hessLag;
     problem.M = M;
     
+    % Make the grad and hess of the Lagrangian at the current point
     gradLagvec = gradMetricVectorize(xCur, gradLag, problem, basis);
     hessLagmat = hessMatLagrangian(xCur, problem, basis);
     
-    %%%%%% WRTOE HERE%%%%%
+    % Tailor linearized constraints to the subproblem
+    [ineqconst_gradmat, ineqconst_costvec, ...
+     eqconst_gradmat, eqconst_costvec] = gradConstraintMatrix(xCur, problem0,...
+                                                              basis);
+                                                          
+     % Compute the direction and Lagrange multipliers
+     % by solving QP with quadprog, a matlab solver for QP
+    [deltaXast, fval, ~, ~, Lagmultipliers] = quadprog(hessLagmat, gradLagvec,...
+     ineqconst_gradmat, -ineqconst_costvec, eqconst_gradmat, -eqconst_costvec,...
+     [],[],problem0.zerovec());
+ 
+    % Update rho, a penalty parameter, if needed.
+    newacc = 0;
+    for iterineq = 1 : problem0.condet.n_ineq_constraint_cost
+        newacc = max(newacc, Lagmultipliers.ineqlin(iterineq));
+    end
+    for itereq = 1 : problem0.condet.n_eq_constraint_cost
+        newacc = max(newacc, abs(Lagmultipliers.eqlin(itereq)));
+    end
     
-    [ineqconst_gradmat, eqconst_gradmat] = gradConstraintMatrix(xCur, problem0, basis);
+    if rho < newacc
+       rho = newacc;
+    end
     
-    inneroptions.tolgradnorm = tolgradnorm;
-    inneroptions.verbosity = 0;
-    inneroptions.maxiter = options.maxInnerIter;
-    inneroptions.minstepsize = options.minstepsize;
-         
-    [xCur, cost, innerinfo, Oldinneroptions] = quadprog(problem0, xCur, inneroptions);
+    % make the struct 'meritproblem', which consists of the L1 merit function
+    % as meritproblem.cost, M as meritproble.M (for M.retr), and rho,tau,,
+    f0 = loneMeritFunction(problem0, xCur, rho)
     
-    % Tailor the quadratic model of the Lagrangian and linearized constraints 
-    % to meet the subproblem, a quadratic programming; QP, at the current point
-    
-    % Compute the direction by solving QP with quadprog, a matlab solver for QP
     
     % Compute the stepsize with the L1-type merit function and the Armijo
     % rule
+    [stepsize, newx , newkey, lsstats] = loneMeritArmijoLineSearch(meritproblem,...
+                                                        x,d,f0,df0,options)
     
     % Update variables to new iterate
-        
+    mus = Lagmultipliers.ineqlin;
+    lambdas = Lagmultipliers.eqlin;
+    
     % Routine in charge of collecting the current iteration stats
-
     function stats = savestats()
         stats.iter = iter;
         stats.cost = xCurCost;
@@ -272,66 +291,3 @@ function [x, cost, info, options] = sqponmani(problem0, x0, options)
         stats = applyStatsfun(problem0, xCur, storedb, key, options, stats);
     end
 end
-
-
-
-
-function val = costLagrangian(x, problem0, mus, lambdas)
-    val = getCost(problem0, x);
-    if condet.has_ineq_cost
-        for numineq = 1: condet.n_ineq_constraint_cost
-            costhandle = problem0.ineq_constraint_cost{numineq};
-            cost_numineq = costhandle(x)
-            val = val + mus(numineq) * cost_numineq;
-        end
-    end
-
-    if condet.has_eq_cost
-        for numeq = 1: condet.n_eq_constraint_cost
-            costhandle = problem0.eq_constraint_cost{numeq};
-            cost_numeq = costhandle(x);
-            val = val + lambdas(numeq) * cost_numeq;
-        end
-    end
-end
-
-
-function val = gradLagrangian(x, problem0, mus, lambdas)
-    val = getGradient(problem0, x);
-    if condet.has_ineq_cost
-        for numineq = 1: condet.n_ineq_constraint_cost
-            % costhandle = problem.ineq_constraint_cost{numineq};
-            % cost_numineq = costhandle(x);
-            gradhandle = problem0.ineq_constraint_grad{numineq};
-            constraint_grad = gradhandle(x);
-            constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
-            val = problem0.M.lincomb(x, 1, val, mus(numineq), constraint_grad);
-        end
-    end
-
-    if condet.has_eq_cost
-        for numeq = 1:condet.n_eq_constraint_cost
-            % costhandle = problem.eq_constraint_cost{numeq};
-            % cost_numeq = costhandle(x);
-            gradhandle = problem0.eq_constraint_grad{numeq};
-            constraint_grad = gradhandle(x);
-            constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
-            val = problem0.M.lincomb(x, 1, val, lambdas(numeq), constraint_grad);
-        end
-    end
-end
-
-function gradmetvec = gradMetricVectorize(x, grad, problem, basis)
-    n = numel(basis); 
-    gradmetvec = zeros(n);
-    for i = 1 : n
-            gradmetvec(i) = problem.M.inner(x, grad, basis{i});
-    end
-end
-
-
-function hessLagmat = hessMatLagrangian(x, problem, basis)
-    [hessLagmat, ~] = hessianmatrix(problem, x, basis);
-end
-
-
