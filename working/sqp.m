@@ -143,26 +143,15 @@ function [x, cost] = sqp(problem0, x0, options)
         problem0.approxgrad = approxgradientFD(problem0);
     end
     
-    % Local defaults for the program
-    localdefaults.max_outer_iter = 1000;
-    localdefaults.maxtime = 3600;
-    localdefaults.min_stepsize = 1e-10;
-    localdefaults.tolgradnorm = 1e-6;
-    localdefaults.storedepth = 30;
-    localdefaults.tau = 0.8;  % TODO: should find an appropriate value as long as tau > 0
-    localdefaults.rho = 1;  % TODO: should find an appropriate value as long as rho > 0
-    localdefaults.beta = 0.5;  % TODO: should find an appropriate value as long as 1 > beta > 0
-    localdefaults.gamma = 0.5; % TODO: should find an appropriate value as long as 1 > gamma > 0  
-    localdefaults.mus = ones(problem0.condet.n_ineq_constraint_cost, 1);
-    localdefaults.lambdas = ones(problem0.condet.n_eq_constraint_cost, 1);    
-    localdefaults.ls_max_steps  = 30;
+    % If the struct 'problem0' does not have a condet field (and it is a
+    % expected situation), add the field to the problem0 here.
+    if ~isfield(problem0, 'condet')
+        problem0.condet = constraintsdetail(problem0);
+    end
     
-%     % TODO: reconsider below. is this if-else part needed?
-%     if ~canGetLinesearch(problem0)
-%         localdefaults.linesearch = @linesearch;
-%     else
-%         localdefaults.linesearch = @linesearch_hint;
-%     end
+    % Set localdefaults, a struct to be combined with argument options for
+    % declaring hyperparameters.
+    localdefaults = setLocalDefaults(problem0);
     
     % Merge global and local defaults, then merge w/ user options, if any.
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
@@ -173,54 +162,48 @@ function [x, cost] = sqp(problem0, x0, options)
     
     % Create a random starting point if no starting point is provided.
     if ~exist('x0', 'var')|| isempty(x0)
-        xCur = pronlem0.M.rand(); 
+        xCur = problem0.M.rand(); 
     else
         xCur = x0;
     end
     
-    % Up to  here, the codes are borrowed from manopt. Now, we added the following
-    % ones for SQP on manifolds.
+    % Up to  here, the codes are borrowed from manopt and preceding works.
+    % Now, we added the followings for SQP on manifolds.
     
     % Get the canonical basis corresponding with the manifold. We use this
     % for vectorizing gradients and make Hessianmatrix, both of which are
     % applied with Riemannian metrics.
     % NOTICE: The function only assume the case that the tangent spaces
-    % of M have the same basis as that of M because this is a prototyping
-    % vesion. For more detail, please check makeCanonicalBasis.m.
+    % of M have the same basis as that of M. For more detail, please check 
+    % makeCanonicalBasis.m.
     basis = makeCanonicalBasis(problem0);
   
+
+    
     % Create a store database and get a key for the current x
     storedb = StoreDB(options.storedepth);
     key = storedb.getNewKey();
     
-    % Rename
-    M = problem0.M;
-    % condet = problem0.condet; % NOTICE: this is different from 
-    % other algorithms since others don't require that problem0 has condet.
-    rho = options.rho;
-    mus = options.mus;
-    lambdas = options.lambdas;
-
-    timetic = tic();
-    
     % __Initialization of variables__
-    % Number of iterations since the last restart
-    k = 0;  
-    % Total number of SQP iterations
-    iter = 0;
-    % Norm of the step
-    stepsize = 1;
-    % Line-search stastics for recording in info
-    lsstats = [];
+    % create some variables which will be used in the following loop.
+    M = problem0.M; % to make a subproblem on the manifold.
+    mus = options.mus; % initinal mus and lambdas for the Lagrangian
+    lambdas = options.lambdas;
+    rho = options.rho; % initinal rho for merit function
+    stepsize = 1; % initial stepsize for linesearch
+    lsstats = []; % Line-search stastics for recording in info.
     
+    iter = 0;
+    timetic =tic();
     % Save stats in a struct array info, and preallocate.
     stats = savestats();
     info(1) = stats;
-    %info(min(10000, options.maxiter+1)).iter = [];
+    % info(min(10000, options.maxouteriter+1)).iter = [];
        
     totaltime = tic();
     
-    for outer_iter = 1:options.max_outer_iter
+    % Main loop where we solve subproblems iteratively
+    for iter = 1:options.maxouteriter
 
         if options.verbosity >= 2
             fprintf(' iter                   cost val            grad. norm           alpha\n');
@@ -229,8 +212,8 @@ function [x, cost] = sqp(problem0, x0, options)
         timetic = tic();
 
         % Get current Hessian and gradient of the cost function.
-        % Also, make a "problem" structure which expresses the subproblem at the
-        % current point.
+        % Also, make a "problem" structure stading for the subproblem
+        % at the current point.
         fprintf('Iteration: %d     ', iter);
         costLag = @(X) costLagrangian(X, problem0, mus, lambdas); % value
         gradLag = @(X) gradLagrangian(X, problem0, mus, lambdas); % in the tangent space
@@ -244,19 +227,21 @@ function [x, cost] = sqp(problem0, x0, options)
         gradLagvec = gradMetricVectorize(xCur, gradLag(xCur), problem, basis);
         hessLagmat = hessMatLagrangian(xCur, problem, basis);
 
-        % Tailor linearized constraints to the subproblem
+        % Tailor linearized constraints to the subproblem from the original
+        % problem0.
         [ineqconst_gradmat, ineqconst_costvec, ...
          eqconst_gradmat, eqconst_costvec] = gradConstraintMatrix(xCur, problem0,...
                                                                   basis);
 
          % Compute the direction and Lagrange multipliers
          % by solving QP with quadprog, a matlab solver for QP
-        [deltaXast, fval, ~, ~, Lagmultipliers] = quadprog(hessLagmat, gradLagvec,...
+        [deltaXast, fval, exitflag, ~, Lagmultipliers] = quadprog(hessLagmat, gradLagvec,...
          ineqconst_gradmat, -ineqconst_costvec, eqconst_gradmat, -eqconst_costvec,...
          [],[],problem0.M.zerovec(xCur));
 
         % Update rho, a penalty parameter, if needed.
         newacc = 0;
+
         for iterineq = 1 : problem0.condet.n_ineq_constraint_cost
             newacc = max(newacc, Lagmultipliers.ineqlin(iterineq));
         end
@@ -289,7 +274,7 @@ function [x, cost] = sqp(problem0, x0, options)
         % refer to stop criteria        
         if toc(totaltime) >= options.maxtime
             break
-        elseif stepsize <= options.min_stepsize
+        elseif stepsize <= options.minstepsize
             break
         elseif problem0.M.norm(xPrev, deltaXast) <= options.tolgradnorm
             break

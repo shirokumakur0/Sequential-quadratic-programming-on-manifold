@@ -6,13 +6,4 @@
 %    basis{k} = vec
 % end
 clear;
-
-canonicalbase = cell(0)
-canonicalbase{3,5} = []
-
-
-for i = 100:0
-    3+5
-end
-
-7
+A = rand(3,3);

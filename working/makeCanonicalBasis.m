@@ -15,8 +15,8 @@ function canonicalbasis = makeCanonicalBasis(problem0)
     % respectively. 
     % This part is an uncomplete if we launch this algorithm, officialy.
     
-    canonicalbasis = cell(size(problem0.M.zerovec()))
-    n = numel(problem0.M.zerovec())
+    canonicalbasis = cell(size(problem0.M.zerovec()));
+    n = numel(problem0.M.zerovec());
     for k = 1 : n
         vec = problem0.M.zerovec();
         vec(k) = 1;

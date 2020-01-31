@@ -34,12 +34,12 @@ for n = 0:3:10
         problem.M = manifold;
         tanspcdim = numel(problem.M.zerovec());
         canonicalbasis = makeCanonicalBasis(problem);
-        assert(isa(canonicalbasis, 'cell'),'Stiefel: The data type is not cell.')
+        assert(isa(canonicalbasis, 'cell'),'Stiefel: The data type is not cell.');
         if n == 0 || p == 0
             test = cell(n,0);
             assert(isequal(canonicalbasis, test),...
                 'Stiefel: canonicalbase does not match the expected one: n: %d, idx: %d.',...
-                n, 0)
+                n, 0);
         else
             for idx = 1:tanspcdim
                 idxbase = problem.M.zerovec();
@@ -49,7 +49,7 @@ for n = 0:3:10
                 n, idx);
             end
         end
-    end
+    end    
 end
 
 % Test 3 Oblique manifold case
@@ -59,7 +59,7 @@ for n = 1:3:10
         problem.M = manifold;
         tanspcdim = numel(problem.M.zerovec());
         canonicalbasis = makeCanonicalBasis(problem);
-        assert(isa(canonicalbasis, 'cell'),'Oblique: The data type is not cell.')
+        assert(isa(canonicalbasis, 'cell'),'Oblique: The data type is not cell.');
         for idx = 1:tanspcdim
             idxbase = problem.M.zerovec();
             idxbase(idx) = 1;
@@ -69,3 +69,5 @@ for n = 1:3:10
         end
     end
 end
+
+fprintf('All tests have been accepted! [test_makeCanonicalBasis]\n')

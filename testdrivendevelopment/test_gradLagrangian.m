@@ -5,28 +5,7 @@ clear;
 % the Lagrangian at x, which should be a vector.
 
 % Test 1, sphere case
-manifold = spherefactory(2);
-problem.M = manifold;
-A = [1;2];
-problem.cost = @(x) A' * x;
-problem.egrad = @(x) A;
-
-I1 = [-1; 0];
-I2 = [0; 1];
-problem.ineq_constraint_cost = cell(2,1);
-problem.ineq_constraint_grad = cell(2,1);
-problem.ineq_constraint_cost{1} = @(x) I1' * x;
-problem.ineq_constraint_grad{1} = @(x) I1;
-problem.ineq_constraint_cost{2} = @(x) I2' * x;
-problem.ineq_constraint_grad{2} = @(x) I2;
-
-E1 = [1;1];
-problem.eq_constraint_cost = cell(1,1);
-problem.eq_constraint_grad = cell(1,1);
-problem.eq_constraint_cost{1} = @(x) E1' * x;
-problem.eq_constraint_grad{1} = @(x) E1;
-
-problem.condet = constraintsdetail(problem);
+problem = exampleProblemSphere();
 mus = ones(2,1);
 lambdas = ones(1,1);
 % case 1
@@ -41,3 +20,26 @@ assert(isequal(grad,[1;0]));
 x = [1;0];
 grad = gradLagrangian(x, problem, mus, lambdas);
 assert(isequal(grad,[0;4]));
+
+% case 4, where we use checkGradent function. Since this procedure
+% generate a figure, if you don't want to make additional tabs,(for example, 
+% when you run all tests at once?), please comment out this test.
+
+% newproblem = makeLagrangianforTest(problem,mus,lambdas);
+% checkgradient(newproblem);
+
+% Test 2, stiefel case
+problem = exampleProblemStiefel();
+mus = ones(6,1);
+lambdas = ones(1,1);
+% newproblem = makeLagrangianforTest(problem,mus,lambdas);
+% checkgradient(newproblem);
+
+% Test 3, oblique case
+problem = exampleProblemOblique();
+mus = ones(6,1);
+lambdas = ones(1,1);
+% newproblem = makeLagrangianforTest(problem,mus,lambdas);
+% checkgradient(newproblem);
+
+fprintf('All tests have been accepted! [test_gradLagrangian]\n')
