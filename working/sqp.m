@@ -1,4 +1,6 @@
-function [x, cost, info, options] = sqponmani(problem0, x0, options)
+function [x, cost] = sqp(problem0, x0, options)
+% TODO: function [x, cost, info,options] = sqponmani(problem0, x0, options)
+
 % Sequential Quadratic Programming solver for smooth objective functions 
 % on Riemannian manifolds.
 %
@@ -142,10 +144,10 @@ function [x, cost, info, options] = sqponmani(problem0, x0, options)
     end
     
     % Local defaults for the program
-    localdefaults.minstepsize = 1e-10;
-    localdefaults.maxiter = 1000;
+    localdefaults.max_outer_iter = 1000;
+    localdefaults.maxtime = 3600;
+    localdefaults.min_stepsize = 1e-10;
     localdefaults.tolgradnorm = 1e-6;
-    localdefaults.ls_max_steps  = 25;
     localdefaults.storedepth = 30;
     localdefaults.tau = 0.8;  % TODO: should find an appropriate value as long as tau > 0
     localdefaults.rho = 1;  % TODO: should find an appropriate value as long as rho > 0
@@ -153,13 +155,14 @@ function [x, cost, info, options] = sqponmani(problem0, x0, options)
     localdefaults.gamma = 0.5; % TODO: should find an appropriate value as long as 1 > gamma > 0  
     localdefaults.mus = ones(problem0.condet.n_ineq_constraint_cost, 1);
     localdefaults.lambdas = ones(problem0.condet.n_eq_constraint_cost, 1);    
+    localdefaults.ls_max_steps  = 30;
     
-    % TODO: reconsider below. is this if-else part needed?
-    if ~canGetLinesearch(problem0)
-        localdefaults.linesearch = @linesearch;
-    else
-        localdefaults.linesearch = @linesearch_hint;
-    end
+%     % TODO: reconsider below. is this if-else part needed?
+%     if ~canGetLinesearch(problem0)
+%         localdefaults.linesearch = @linesearch;
+%     else
+%         localdefaults.linesearch = @linesearch_hint;
+%     end
     
     % Merge global and local defaults, then merge w/ user options, if any.
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
@@ -213,73 +216,95 @@ function [x, cost, info, options] = sqponmani(problem0, x0, options)
     % Save stats in a struct array info, and preallocate.
     stats = savestats();
     info(1) = stats;
-    info(min(10000, options.maxiter+1)).iter = [];
+    %info(min(10000, options.maxiter+1)).iter = [];
+       
+    totaltime = tic();
     
-    if options.verbosity >= 2
-        fprintf(' iter                   cost val            grad. norm           alpha\n');
-    end
-    
-    timetic = tic();
+    for outer_iter = 1:options.max_outer_iter
 
-    % Get current Hessian and gradient of the cost function.
-    % Also, make a "problem" structure which expresses the subproblem at the
-    % current point.
-    fprintf('Iteration: %d     ', iter);
-    costLag = @(X) costLagrangian(X, problem0, mus, lambdas); % value
-    gradLag = @(X) gradLagrangian(X, problem0, mus, lambdas); % in the tangent space
-    hessLag = @(X, d) hessLagrangian(X, d, problem0, mus, lambdas); % in the tangent space
-    problem.cost = costLag;
-    problem.grad = gradLag;
-    problem.hess = hessLag;
-    problem.M = M;
-    
-    % Make the grad and hess of the Lagrangian at the current point
-    gradLagvec = gradMetricVectorize(xCur, gradLag, problem, basis);
-    hessLagmat = hessMatLagrangian(xCur, problem, basis);
-    
-    % Tailor linearized constraints to the subproblem
-    [ineqconst_gradmat, ineqconst_costvec, ...
-     eqconst_gradmat, eqconst_costvec] = gradConstraintMatrix(xCur, problem0,...
-                                                              basis);
-                                                          
-     % Compute the direction and Lagrange multipliers
-     % by solving QP with quadprog, a matlab solver for QP
-    [deltaXast, fval, ~, ~, Lagmultipliers] = quadprog(hessLagmat, gradLagvec,...
-     ineqconst_gradmat, -ineqconst_costvec, eqconst_gradmat, -eqconst_costvec,...
-     [],[],problem0.zerovec());
- 
-    % Update rho, a penalty parameter, if needed.
-    newacc = 0;
-    for iterineq = 1 : problem0.condet.n_ineq_constraint_cost
-        newacc = max(newacc, Lagmultipliers.ineqlin(iterineq));
+        if options.verbosity >= 2
+            fprintf(' iter                   cost val            grad. norm           alpha\n');
+        end
+
+        timetic = tic();
+
+        % Get current Hessian and gradient of the cost function.
+        % Also, make a "problem" structure which expresses the subproblem at the
+        % current point.
+        fprintf('Iteration: %d     ', iter);
+        costLag = @(X) costLagrangian(X, problem0, mus, lambdas); % value
+        gradLag = @(X) gradLagrangian(X, problem0, mus, lambdas); % in the tangent space
+        hessLag = @(X, d) hessLagrangian(X, d, problem0, mus, lambdas); % in the tangent space
+        problem.cost = costLag;
+        problem.grad = gradLag;
+        problem.hess = hessLag;
+        problem.M = M;
+
+        % Make the grad and hess of the Lagrangian at the current point
+        gradLagvec = gradMetricVectorize(xCur, gradLag(xCur), problem, basis);
+        hessLagmat = hessMatLagrangian(xCur, problem, basis);
+
+        % Tailor linearized constraints to the subproblem
+        [ineqconst_gradmat, ineqconst_costvec, ...
+         eqconst_gradmat, eqconst_costvec] = gradConstraintMatrix(xCur, problem0,...
+                                                                  basis);
+
+         % Compute the direction and Lagrange multipliers
+         % by solving QP with quadprog, a matlab solver for QP
+        [deltaXast, fval, ~, ~, Lagmultipliers] = quadprog(hessLagmat, gradLagvec,...
+         ineqconst_gradmat, -ineqconst_costvec, eqconst_gradmat, -eqconst_costvec,...
+         [],[],problem0.M.zerovec(xCur));
+
+        % Update rho, a penalty parameter, if needed.
+        newacc = 0;
+        for iterineq = 1 : problem0.condet.n_ineq_constraint_cost
+            newacc = max(newacc, Lagmultipliers.ineqlin(iterineq));
+        end
+        for itereq = 1 : problem0.condet.n_eq_constraint_cost
+            newacc = max(newacc, abs(Lagmultipliers.eqlin(itereq)));
+        end
+
+        if rho < newacc
+           rho = newacc;
+        end
+
+        % make the struct 'meritproblem', which consists of the L1 merit function
+        % as meritproblem.cost, M as meritproble.M (for M.retr), and rho,tau,,
+        f0 = loneMeritFunction(problem0, xCur, rho);
+        df0 = fval - problem.M.inner(xCur, problem.grad(xCur),deltaXast);
+
+        % Compute the stepsize with the L1-type merit function and the Armijo
+        % rule
+        % TODO: the return values rom loneMeritArmijoLineSearch should be 
+        % [stepsize, newx, newkey, lsstats] for speeding up.
+        [stepsize, newx] = loneMeritArmijoLineSearch(problem0,rho,...
+                                                            xCur,deltaXast,f0,df0,options);
+        
+        % Update variables to new iterate
+        xPrev = xCur;
+        xCur = newx;
+        mus = Lagmultipliers.ineqlin;
+        lambdas = Lagmultipliers.eqlin;
+                                                        
+        % refer to stop criteria        
+        if toc(totaltime) >= options.maxtime
+            break
+        elseif stepsize <= options.min_stepsize
+            break
+        elseif problem0.M.norm(xPrev, deltaXast) <= options.tolgradnorm
+            break
+        end
     end
-    for itereq = 1 : problem0.condet.n_eq_constraint_cost
-        newacc = max(newacc, abs(Lagmultipliers.eqlin(itereq)));
-    end
     
-    if rho < newacc
-       rho = newacc;
-    end
+    x = xCur;
+    cost = problem0.cost(x);
     
-    % make the struct 'meritproblem', which consists of the L1 merit function
-    % as meritproblem.cost, M as meritproble.M (for M.retr), and rho,tau,,
-    f0 = loneMeritFunction(problem0, xCur, rho)
-    
-    
-    % Compute the stepsize with the L1-type merit function and the Armijo
-    % rule
-    [stepsize, newx , newkey, lsstats] = loneMeritArmijoLineSearch(meritproblem,...
-                                                        x,d,f0,df0,options)
-    
-    % Update variables to new iterate
-    mus = Lagmultipliers.ineqlin;
-    lambdas = Lagmultipliers.eqlin;
     
     % Routine in charge of collecting the current iteration stats
     function stats = savestats()
         stats.iter = iter;
-        stats.cost = xCurCost;
-        stats.gradnorm = xCurGradNorm;
+        %stats.cost = xCurCost;
+        %stats.gradnorm = xCurGradNorm;
         if iter == 0
             stats.stepsize = NaN;
             stats.time = toc(timetic);
@@ -287,7 +312,7 @@ function [x, cost, info, options] = sqponmani(problem0, x0, options)
             stats.stepsize = stepsize;
             stats.time = info(iter).time + toc(timetic);
         end
-        stats.linesearch = lsstats;
+        % stats.linesearch = lsstats;
         stats = applyStatsfun(problem0, xCur, storedb, key, options, stats);
     end
 end

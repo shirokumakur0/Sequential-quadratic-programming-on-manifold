@@ -5,7 +5,7 @@ function [ineqconst_gradmat, ineqconst_costvec, ...
     ineqconst_costvec = [];
     eqconst_gradmat = [];
     eqconst_costvec = [];
-    if condet.has_ineq_cost
+    if problem0.condet.has_ineq_cost
         row = numel(basis);
         col = problem0.condet.n_ineq_constraint_cost;
         for numineq = 1: problem0.condet.n_ineq_constraint_cost
@@ -20,7 +20,7 @@ function [ineqconst_gradmat, ineqconst_costvec, ...
         end
     end
 
-    if condet.has_eq_cost
+    if problem0.condet.has_eq_cost
         row = numel(basis);
         col = problem0.condet.n_eq_constraint_cost;
         for numeq = 1 : problem0.condet.n_eq_constraint_cost
