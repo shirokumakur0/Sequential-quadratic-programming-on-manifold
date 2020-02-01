@@ -49,7 +49,7 @@
  
     % Solve.
     %[x, xcost, info] = steepestdescent(problem);
-    [x, xcost] = sqp(problem, [], []); % #ok<ASGLU>
+    [x, xcost, info] = sqp(problem, [], []); % #ok<ASGLU>
     
     % Display some statistics.
     % figure;

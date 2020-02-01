@@ -1,5 +1,7 @@
-function [x, cost] = sqp(problem0, x0, options)
+function [xfinal, cost, info] = sqpPrimitive(problem0, x0, options)
 % TODO: function [x, cost, info,options] = sqponmani(problem0, x0, options)
+% NOTICE: Probably there is some problem when solving subproblems. Their
+% solutions are too poor.
 
 % Sequential Quadratic Programming solver for smooth objective functions 
 % on Riemannian manifolds.
@@ -178,8 +180,6 @@ function [x, cost] = sqp(problem0, x0, options)
     % makeCanonicalBasis.m.
     basis = makeCanonicalBasis(problem0);
   
-
-    
     % Create a store database and get a key for the current x
     storedb = StoreDB(options.storedepth);
     key = storedb.getNewKey();
@@ -191,23 +191,26 @@ function [x, cost] = sqp(problem0, x0, options)
     lambdas = options.lambdas;
     rho = options.rho; % initinal rho for merit function
     stepsize = 1; % initial stepsize for linesearch
-    lsstats = []; % Line-search stastics for recording in info.
+    % lsstats = []; % Line-search stastics for recording in info.
     
+    % For the initial savestats, declare some variables
     iter = 0;
     timetic =tic();
+    [xCurCost, xCurGradient] = getCostGrad(problem0, xCur, storedb, key);
+    xCurGradNorm = problem0.M.norm(xCur, xCurGradient);
     % Save stats in a struct array info, and preallocate.
     stats = savestats();
     info(1) = stats;
-    % info(min(10000, options.maxouteriter+1)).iter = [];
+    info(min(10000, options.maxouteriter+1)).iter = [];
        
     totaltime = tic();
     
     % Main loop where we solve subproblems iteratively
     for iter = 1:options.maxouteriter
 
-        if options.verbosity >= 2
-            fprintf(' iter                   cost val            grad. norm           alpha\n');
-        end
+        %         if options.verbosity >= 2
+        %             fprintf(' iter                   cost val            grad. norm           alpha\n');
+        %         end
 
         timetic = tic();
 
@@ -235,7 +238,7 @@ function [x, cost] = sqp(problem0, x0, options)
 
          % Compute the direction and Lagrange multipliers
          % by solving QP with quadprog, a matlab solver for QP
-        [deltaXast, fval, exitflag, ~, Lagmultipliers] = quadprog(hessLagmat, gradLagvec,...
+        [deltaXast, fval, ~, ~, Lagmultipliers] = quadprog(hessLagmat, gradLagvec,...
          ineqconst_gradmat, -ineqconst_costvec, eqconst_gradmat, -eqconst_costvec,...
          [],[],problem0.M.zerovec(xCur));
 
@@ -270,26 +273,36 @@ function [x, cost] = sqp(problem0, x0, options)
         xCur = newx;
         mus = Lagmultipliers.ineqlin;
         lambdas = Lagmultipliers.eqlin;
+        [xCurCost, xCurGradient] = getCostGrad(problem0, xCur, storedb, key);
+        xCurGradNorm = problem0.M.norm(xCur, xCurGradient);
+        key = storedb.getNewKey();
+        % save stats
+        stats = savestats();
+        info(iter+1) = stats;
                                                         
         % refer to stop criteria        
         if toc(totaltime) >= options.maxtime
+            fprintf('Max time exceeded');
             break
         elseif stepsize <= options.minstepsize
+            fprintf('Min stepsize exceeded');
             break
         elseif problem0.M.norm(xPrev, deltaXast) <= options.tolgradnorm
+            fprintf('Tol grad norm exceeded');
             break
         end
     end
     
-    x = xCur;
-    cost = problem0.cost(x);
+    xfinal = xCur;
+    cost = problem0.cost(xfinal);
     
     
     % Routine in charge of collecting the current iteration stats
     function stats = savestats()
         stats.iter = iter;
-        %stats.cost = xCurCost;
-        %stats.gradnorm = xCurGradNorm;
+        stats.xCur = xCur;
+        stats.cost = xCurCost;
+        stats.gradnorm = xCurGradNorm;
         if iter == 0
             stats.stepsize = NaN;
             stats.time = toc(timetic);
