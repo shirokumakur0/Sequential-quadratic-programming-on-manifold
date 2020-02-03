@@ -1,7 +1,7 @@
 function [xfinal, cost, info] = sqpPrimitive(problem0, x0, options)
 % TODO: function [x, cost, info,options] = sqponmani(problem0, x0, options)
 % NOTICE: Probably there is some problem when solving subproblems. Their
-% solutions are too poor.
+% solutions are too poor. DEBUG FIRSTLY.
 
 % Sequential Quadratic Programming solver for smooth objective functions 
 % on Riemannian manifolds.
@@ -198,6 +198,7 @@ function [xfinal, cost, info] = sqpPrimitive(problem0, x0, options)
     timetic =tic();
     [xCurCost, xCurGradient] = getCostGrad(problem0, xCur, storedb, key);
     xCurGradNorm = problem0.M.norm(xCur, xCurGradient);
+    fval = NaN;
     % Save stats in a struct array info, and preallocate.
     stats = savestats();
     info(1) = stats;
@@ -239,8 +240,7 @@ function [xfinal, cost, info] = sqpPrimitive(problem0, x0, options)
          % Compute the direction and Lagrange multipliers
          % by solving QP with quadprog, a matlab solver for QP
         [deltaXast, fval, ~, ~, Lagmultipliers] = quadprog(hessLagmat, gradLagvec,...
-         ineqconst_gradmat, -ineqconst_costvec, eqconst_gradmat, -eqconst_costvec,...
-         [],[],problem0.M.zerovec(xCur));
+         ineqconst_gradmat, -ineqconst_costvec, eqconst_gradmat, -eqconst_costvec);
 
         % Update rho, a penalty parameter, if needed.
         newacc = 0;
@@ -311,6 +311,7 @@ function [xfinal, cost, info] = sqpPrimitive(problem0, x0, options)
             stats.time = info(iter).time + toc(timetic);
         end
         % stats.linesearch = lsstats;
+        stats.fval = fval; % for debug
         stats = applyStatsfun(problem0, xCur, storedb, key, options, stats);
     end
 end

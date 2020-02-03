@@ -107,6 +107,9 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
         stats.maxviolation = maxviolation;
         stats.meanviolation = meanviolation;
         stats.cost = costCur;
+        % addding the information on Lagrange multipliers for sqp
+        stats.lambdas = lambdas;
+        stats.gammas = gammas;
     end
     
     function val = cost_alm(x, problem, rho, lambdas, gammas)

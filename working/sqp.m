@@ -1,6 +1,7 @@
-function [xfinal, cost, info] = sqpALM(problem0, x0, options)
+function [xfinal, cost, info] = sqp(problem0, x0, options)
 % TODO: function [x, cost, info,options] = sqponmani(problem0, x0, options)
-% This is the sqp algorithm with augumented Lagrangian method.
+% NOTICE: Probably there is some problem when solving subproblems. Their
+% solutions are too poor.
 
 % Sequential Quadratic Programming solver for smooth objective functions 
 % on Riemannian manifolds.
@@ -171,21 +172,13 @@ function [xfinal, cost, info] = sqpALM(problem0, x0, options)
     % Up to  here, the codes are borrowed from manopt and preceding works.
     % Now, we added the followings for SQP on manifolds.
     
-    % Get the canonical basis corresponding with the manifold. We use this
-    % for vectorizing gradients and make Hessianmatrix, both of which are
-    % applied with Riemannian metrics.
-    % NOTICE: The function only assume the case that the tangent spaces
-    % of M have the same basis as that of M. For more detail, please check 
-    % makeCanonicalBasis.m.
-    basis = makeCanonicalBasis(problem0);
-  
     % Create a store database and get a key for the current x
     storedb = StoreDB(options.storedepth);
     key = storedb.getNewKey();
     
     % __Initialization of variables__
     % create some variables which will be used in the following loop.
-    M = problem0.M; % to make a subproblem on the manifold.
+    % M = problem0.M; % to make a subproblem on the manifold.
     mus = options.mus; % initinal mus and lambdas for the Lagrangian
     lambdas = options.lambdas;
     rho = options.rho; % initinal rho for merit function
@@ -214,33 +207,21 @@ function [xfinal, cost, info] = sqpALM(problem0, x0, options)
         timetic = tic();
 
         % Get current Hessian and gradient of the cost function.
-        % Also, make a "problem" structure stading for the subproblem
+        % Also, make a "qpinfo" structure stading for the subproblem
         % at the current point.
         fprintf('Iteration: %d     ', iter);
-        costLag = @(X) costLagrangian(X, problem0, mus, lambdas); % value
-        gradLag = @(X) gradLagrangian(X, problem0, mus, lambdas); % in the tangent space
-        hessLag = @(X, d) hessLagrangian(X, d, problem0, mus, lambdas); % in the tangent space
-        problem.cost = costLag;
-        problem.grad = gradLag;
-        problem.hess = hessLag;
-        problem.M = M;
-
-        % Make the grad and hess of the Lagrangian at the current point
-        gradLagvec = gradMetricVectorize(xCur, gradLag(xCur), problem, basis);
-        hessLagmat = hessMatLagrangian(xCur, problem, basis);
-
-        % Tailor linearized constraints to the subproblem from the original
-        % problem0.
-        [ineqconst_gradmat, ineqconst_costvec, ...
-         eqconst_gradmat, eqconst_costvec] = gradConstraintMatrix(xCur, problem0,...
-                                                                  basis);
+        qpinfo = makeQPInfo(problem0, xCur, mus, lambdas);
 
          % Compute the direction and Lagrange multipliers
          % by solving QP with quadprog, a matlab solver for QP
-        [deltaXast, fval, ~, ~, Lagmultipliers] = quadprog(hessLagmat, gradLagvec,...
-         ineqconst_gradmat, -ineqconst_costvec, eqconst_gradmat, -eqconst_costvec,...
-         [],[],problem0.M.zerovec(xCur));
-
+        [coeff, fval, ~, ~, Lagmultipliers] = quadprog(qpinfo.H,qpinfo.f,...
+            qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq);
+        
+        deltaXast = 0;
+        for i = 1:qpinfo.n
+            deltaXast = deltaXast + coeff(i)* qpinfo.basis{i};
+        end
+        
         % Update rho, a penalty parameter, if needed.
         newacc = 0;
 
@@ -258,7 +239,8 @@ function [xfinal, cost, info] = sqpALM(problem0, x0, options)
         % make the struct 'meritproblem', which consists of the L1 merit function
         % as meritproblem.cost, M as meritproble.M (for M.retr), and rho,tau,,
         f0 = loneMeritFunction(problem0, xCur, rho);
-        df0 = fval - problem.M.inner(xCur, problem.grad(xCur),deltaXast);
+        df0 = 2 * options.gamma * (fval - problem0.M.inner(xCur,...
+            gradLagrangian(xCur,problem0, mus, lambdas),deltaXast));
 
         % Compute the stepsize with the L1-type merit function and the Armijo
         % rule
@@ -271,7 +253,7 @@ function [xfinal, cost, info] = sqpALM(problem0, x0, options)
         xPrev = xCur;
         xCur = newx;
         mus = Lagmultipliers.ineqlin;
-        lambdas = Lagmultipliers.eqlin;
+        lambdas =  Lagmultipliers.eqlin;
         [xCurCost, xCurGradient] = getCostGrad(problem0, xCur, storedb, key);
         xCurGradNorm = problem0.M.norm(xCur, xCurGradient);
         key = storedb.getNewKey();

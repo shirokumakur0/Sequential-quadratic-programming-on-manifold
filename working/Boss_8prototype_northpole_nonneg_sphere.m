@@ -49,11 +49,18 @@
     %     options.maxOuterIter = 10000000;
     %     options.maxtime = 3600;
     %     options.minstepsize = 1e-10;
-    %     x0 = problem.M.rand();
+    x0 = problem.M.rand();
     %     [xfinal, info] = almbddmultiplier(problem, x0, options);
     
     % if you use sqp
-    [x, xcost, info] = sqpPrimitive(problem, [], []); % #ok<ASGLU>
+    [x, xcost, info] = sqp(problem, x0, []); % #ok<ASGLU>
+    % if you use sqpALM
+        
+    % options.maxOuterIter = 10000000;
+    %options.maxtime = 3600;
+    %options.minstepsize = 1e-10;
+    %x0 = problem.M.rand();
+    %[x, xcost, info] = sqpALM(problem, x0, options); % #ok<ASGLU>    
     
     % Display some statistics.
     figure;

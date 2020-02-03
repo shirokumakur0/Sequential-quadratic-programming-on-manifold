@@ -27,4 +27,4 @@ lambdas = ones(1,1);
 newproblem = makeLagrangianforTest(problem,mus,lambdas);
 checkhessian(newproblem);
 
-fprintf('All tests have done! Check the generated figures! [test_hessLagrangian]'\n)
+fprintf('All tests have done! Check the generated figures! [test_hessLagrangian]\n')
