@@ -8,9 +8,9 @@
     % Generate the problem data.
     n = 3;
     A = zeros(n);
-    A(n,n) = 5;
+    A(n,n) = 10;
     A(1,1) = 1;
-    A(2,2) = 3;
+    A(2,2) = 100;
     
     % Create the problem structure.
     manifold = spherefactory(n);
@@ -46,21 +46,14 @@
  
     % Solve.
     % if you use ALM    
-    %     options.maxOuterIter = 10000000;
-    %     options.maxtime = 3600;
-    %     options.minstepsize = 1e-10;
-    x0 = problem.M.rand();
-    %     [xfinal, info] = almbddmultiplier(problem, x0, options);
-    
+%          options.maxOuterIter = 10000000;
+%          options.maxtime = 3600;
+%          options.minstepsize = 1e-10;
+     x0 = problem.M.rand();
+%          [xfinal, info] = almbddmultiplier(problem, x0, options);
+    options.trimhessian = "eye";
     % if you use sqp
-    [x, xcost, info] = sqp(problem, x0, []); % #ok<ASGLU>
-    % if you use sqpALM
-        
-    % options.maxOuterIter = 10000000;
-    %options.maxtime = 3600;
-    %options.minstepsize = 1e-10;
-    %x0 = problem.M.rand();
-    %[x, xcost, info] = sqpALM(problem, x0, options); % #ok<ASGLU>    
+     [x, xcost, info] = sqp(problem, x0, options); % #ok<ASGLU>    
     
     % Display some statistics.
     figure;
