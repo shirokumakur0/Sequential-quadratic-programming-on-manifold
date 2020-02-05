@@ -43,7 +43,7 @@
     %     checkgradient(problem);
     %     figure;
     %     checkhessian(problem);
- 
+
     % Solve.
     % if you use ALM    
 %          options.maxOuterIter = 10000000;
@@ -51,7 +51,7 @@
 %          options.minstepsize = 1e-10;
      x0 = problem.M.rand();
 %          [xfinal, info] = almbddmultiplier(problem, x0, options);
-    options.trimhessian = "eye";
+    options.trimhessian = "mineigval_manopt";
     % if you use sqp
      [x, xcost, info] = sqp(problem, x0, options); % #ok<ASGLU>    
     

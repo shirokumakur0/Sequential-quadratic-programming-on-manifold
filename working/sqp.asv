@@ -229,7 +229,7 @@ function [xfinal, costfinal, info, options] = sqp(problem0, x0, options)
         % save stats
         key = storedb.getNewKey();
         stats = savestats();
-        info(iter+1) = stats;
+        info(iter+1) = stats;s
         fprintf("stepsize:%f,   norm of deltaXast: %f",stepsize, problem0.M.norm(xPrev, deltaXast));
         
                                                         

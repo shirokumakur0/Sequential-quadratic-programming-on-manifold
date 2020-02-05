@@ -1,4 +1,4 @@
-function qpinfo = makeQPInfo(problem, xCur, mus, lambdas)
+function qpinfo = makeQPInfo(problem, xCur, mus, lambdas, options)
     costLag = @(X) costLagrangian(X, problem, mus, lambdas); % though we don't use here.
     gradLag = @(X) gradLagrangian(X, problem, mus, lambdas); % in the tangent space
     hessLag = @(X, d) hessLagrangian(X, d, problem, mus, lambdas); % in the tangent space
@@ -7,6 +7,12 @@ function qpinfo = makeQPInfo(problem, xCur, mus, lambdas)
     auxproblem.cost = costLag;
     auxproblem.grad = gradLag;
     auxproblem.hess = hessLag;
+    
+    %If we'll regularize Hessian in the way of 'mineigval_manopt',
+    %calculate the minimum eigenvalue here.
+    if strcmp(options.trimhessian, "mineigval_manopt")
+        [~ ,qpinfo.mineigval_manopt] = hessianextreme(auxproblem, xCur);
+    end
     
     % make H and basis
     [H,basis] = hessianmatrix(auxproblem, xCur);
