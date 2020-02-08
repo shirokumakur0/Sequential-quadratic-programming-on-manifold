@@ -148,7 +148,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     localdefaults.maxtime = 3600;
     localdefaults.tolqpnorm = 1e-6;
     localdefaults.tolstepnorm = 1e-6;
-    localdefaults.tolgradnorm = 1e-7;
+    localdefaults.tolgradnorm = 1e-6;
     % Hyperparameters for StoreDB
     localdefaults.storedepth = 3;
     % The way to treat the hessian matrix to be positive semidefinete.
@@ -161,7 +161,9 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     localdefaults.mus = ones(problem0.condet.n_ineq_constraint_cost, 1);
     localdefaults.lambdas = ones(problem0.condet.n_eq_constraint_cost, 1);    
     localdefaults.ls_max_steps  = 30;
-    %localdefaults.regularhesseigval = 1e-3;
+    localdefaults.regularhesseigval = 1e-3;
+    localdefaults.ls_perturbation = 1e-4;
+    localdefaults.qp_verbosity = 0;
     
     % Merge global and local defaults, then merge w/ user options, if any.
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
@@ -169,6 +171,13 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         options = struct();
     end
     options = mergeOptions(localdefaults, options);
+    
+    % set quadprog verbosity
+    if options.qp_verbosity == 0
+        qpoptions = optimset('Display','off');
+    else
+        qpoptions = [];
+    end
     
     % Create a random starting point if no starting point is provided.
     if ~exist('x0', 'var')|| isempty(x0)
@@ -186,7 +195,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     mus = options.mus; % initinal mus and lambdas for the Lagrangian
     lambdas = options.lambdas;
     rho = options.rho; % initinal rho for merit function
-    stepsize = 1; % initial stepsize for linesearch
+    % stepsize = 1; % initial stepsize for linesearch
     % lsstats = []; % Line-search stastics for recording in info.
     
     % For the initial savestats, declare some variables
@@ -200,6 +209,10 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     stats = savestats();
     info(1) = stats;
     info(min(10000, options.maxiter+1)).iter = [];
+    
+    % stop flag, finally it should be true
+    stop = false;
+    totaltime = tic();
     
     % Main loop where we solve subproblems iteratively
     while true
@@ -215,9 +228,9 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         % Get current Hessian and gradient of the cost function.
         % Also, make a "qpinfo" structure stading for the subproblem
         % at the current point.
-        costLag = @(X) costLagrangian(X, problem0, mus, lambdas); % though we don't use here.
-        gradLag = @(X) gradLagrangian(X, problem0, mus, lambdas); % in the tangent space
-        hessLag = @(X, d) hessLagrangian(X, d, problem0, mus, lambdas); % in the tangent space
+        costLag = @(X) costLagrangian(X, mus, lambdas); % though we don't use here.
+        gradLag = @(X) gradLagrangian(X, mus, lambdas); % in the tangent space
+        hessLag = @(X, d) hessLagrangian(X, d, mus, lambdas); % in the tangent space
 
         auxproblem.M = problem0.M;
         auxproblem.cost = costLag;
@@ -305,16 +318,17 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             % an optimization problem to get a minimum eigenvalue and 
             % the corresponding eigenvector.
             [~ ,qpinfo.mineigval] = hessianextreme(auxproblem, xCur);
-            if mineigval < 0
+            if qpinfo.mineigval < 0
                 qpinfo.regularmineigval = max(options.regularhesseigval, abs(qpinfo.mineigval));
                 qpinfo.H = qpinfo.H + qpinfo.regularmineigval * eye(qpinfo.n);
             end
         end
+        
 
         % Compute the direction and Lagrange multipliers
         % by solving QP with quadprog, a matlab solver for QP
         [coeff, ~, ~, ~, Lagmultipliers] = quadprog(qpinfo.H, qpinfo.f,...
-            qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq);
+            qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq, [], [], [], qpoptions);
         
         deltaXast = 0;
         for i = 1:qpinfo.n
@@ -347,24 +361,25 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         elseif strcmp(options.trimhessian, 'mineigval_matlab') || strcmp(options.trimhessian, 'mineigval_manopt')
             if qpinfo.mineigval < 0
                 df0 = meritproblem.M.inner(xCur, hessLagrangian(xCur, deltaXast,...
-                problem0, mus, lambdas) + qpinfo.regularmineigval * deltaXast, deltaXast);
+                    mus, lambdas) + qpinfo.regularmineigval * deltaXast, deltaXast);
             else 
                 df0 = meritproblem.M.inner(xCur, hessLagrangian(xCur, deltaXast,...
-                problem0, mus, lambdas), deltaXast);
+                    mus, lambdas), deltaXast);
             end
         else % standard setting
             df0 = meritproblem.M.inner(xCur, hessLagrangian(xCur, deltaXast,...
-                problem0, mus, lambdas), deltaXast);
+                    mus, lambdas), deltaXast);
         end
         
         % Compute the stepsize with the L1-type merit function and the Armijo rule
+        stepsize = 1;
         newx = meritproblem.M.retr(xCur, deltaXast, stepsize);
         newf = meritproblem.cost(newx);
         gammadf0 = options.gamma * df0;
         r = 0;
         lsmaxiterbreak = false;
         % descriptCost(meritproblem, xCur, deltaXast); % DEBUG only
-        while newf > ( f0 - gammadf0) && abs(newf - ( f0 - gammadf0)) > 10^(-4)
+        while newf > ( f0 - gammadf0) && abs(newf - ( f0 - gammadf0)) > options.ls_perturbation
             if r > options.ls_max_steps
                 lsmaxiterbreak = true;
                 break;
@@ -375,9 +390,10 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             newx = meritproblem.M.retr(xCur, deltaXast, stepsize);
             newf = meritproblem.cost(newx);
         end
-       % For savestats
         
-        qpsolnorm = problem0.M.norm(xCur, deltaXast);
+        % For savestats
+        qpsolnorm = stepsize * problem0.M.norm(xCur, deltaXast);
+        iterdist = problem0.dist(xCur, newx);
         
         % Update variables to new iterate
         xCur = newx;
@@ -388,14 +404,13 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         xCurCost = getCost(problem0, xCur, storedb, key);
         xCurLagGrad = gradLagrangian(xCur, mus, lambdas);
         xCurLagGradNorm = problem0.M.norm(xCur, xCurLagGrad);        
-
+        
         % savestats
         key = storedb.getNewKey();
         stats = savestats();
         info(iter+1) = stats;
         
         % refer to stop criteria        
-        stop = false;
         if iter >= options.maxiter
             fprintf('Max iter count reached\n');
             options.reason = "Max iter count reached";
@@ -408,10 +423,20 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             fprintf('Legrangian Gradient norm tolerance reached \n');
             options.reason = "Legrangian Gradient norm tolerance reached";
             stop = true;
-        elseif qpsolnorm <= options.tolgradnorm
-            fprintf('Tol grad norm exceeded\n');
-            stip = true;
+        elseif qpsolnorm <= options.tolqpnorm
+            fprintf('QP solution norm with stepsize tolerance reached\n');
+            options.reason = "Legrangian Gradient norm tolerance reached";
+            stop = true;
+        elseif iterdist <= options.toliterdist
+            fprintf('Distance at iteration tolerance reached\n');
+            
         end
+        
+        if stop
+        options.totaltime = toc(totaltime);
+        break
+        end
+        
     end
     
     xfinal = xCur;
@@ -434,6 +459,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             stats.stepsize = stepsize;
             stats.lsmaxiterbreak = lsmaxiterbreak;
         end
+        stats.rho = rho;
         stats = applyStatsfun(problem0, xCur, storedb, key, options, stats);
     end
 

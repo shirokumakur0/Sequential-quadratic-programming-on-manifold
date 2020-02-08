@@ -146,9 +146,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     % declaring hyperparameters.
     localdefaults.maxiter = 1000;
     localdefaults.maxtime = 3600;
-    localdefaults.tolqpnorm = 1e-6;
-    localdefaults.tolstepnorm = 1e-6;
-    localdefaults.tolgradnorm = 1e-7;
+    localdefaults.tolqpnorm = 1e-5;
+    localdefaults.tolgradnorm = 1e-6;
     % Hyperparameters for StoreDB
     localdefaults.storedepth = 3;
     % The way to treat the hessian matrix to be positive semidefinete.
@@ -163,6 +162,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     localdefaults.ls_max_steps  = 30;
     localdefaults.regularhesseigval = 1e-3;
     localdefaults.ls_perturbation = 1e-4;
+    localdefaults.qp_verbosity = 0;
+    localdefaults.toliterdist = 1e-6;
     
     % Merge global and local defaults, then merge w/ user options, if any.
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
@@ -170,6 +171,13 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         options = struct();
     end
     options = mergeOptions(localdefaults, options);
+    
+    % set quadprog verbosity
+    if options.qp_verbosity == 0
+        qpoptions = optimset('Display','off');
+    else
+        qpoptions = [];
+    end
     
     % Create a random starting point if no starting point is provided.
     if ~exist('x0', 'var')|| isempty(x0)
@@ -315,11 +323,12 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
                 qpinfo.H = qpinfo.H + qpinfo.regularmineigval * eye(qpinfo.n);
             end
         end
+        
 
         % Compute the direction and Lagrange multipliers
         % by solving QP with quadprog, a matlab solver for QP
         [coeff, ~, ~, ~, Lagmultipliers] = quadprog(qpinfo.H, qpinfo.f,...
-            qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq);
+            qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq, [], [], [], qpoptions);
         
         deltaXast = 0;
         for i = 1:qpinfo.n
@@ -384,6 +393,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         
         % For savestats
         qpsolnorm = stepsize * problem0.M.norm(xCur, deltaXast);
+        iterdist = problem0.M.dist(xCur, newx);
         
         % Update variables to new iterate
         xCur = newx;
@@ -394,7 +404,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         xCurCost = getCost(problem0, xCur, storedb, key);
         xCurLagGrad = gradLagrangian(xCur, mus, lambdas);
         xCurLagGradNorm = problem0.M.norm(xCur, xCurLagGrad);        
-
+        
         % savestats
         key = storedb.getNewKey();
         stats = savestats();
@@ -413,17 +423,20 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             fprintf('Legrangian Gradient norm tolerance reached \n');
             options.reason = "Legrangian Gradient norm tolerance reached";
             stop = true;
-        elseif qpsolnorm <= options.tolgradnorm
+        elseif qpsolnorm <= options.tolqpnorm
             fprintf('QP solution norm with stepsize tolerance reached\n');
             options.reason = "Legrangian Gradient norm tolerance reached";
+            stop = true;
+        elseif iterdist <= options.toliterdist
+            fprintf('Distance of iteration tolerance reached\n');
+            options.reason = 'Distance of iteration tolerance reached';
             stop = true;
         end
         
         if stop
-        options.totaltime = toc(totaltime);
-        break
+            options.totaltime = toc(totaltime);
+            break
         end
-        
     end
     
     xfinal = xCur;
@@ -439,13 +452,16 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             stats.qpsolnorm = NaN;
             stats.stepsize = NaN;
             stats.lsmaxiterbreak = NaN;
+            stats.dist =  NaN;
         else
             stats.time = toc(timetic);
             % stats.time = info(iter).time + toc(timetic);
             stats.qpsolnorm = qpsolnorm;
             stats.stepsize = stepsize;
             stats.lsmaxiterbreak = lsmaxiterbreak;
+            stats.dist = iterdist;
         end
+        stats.rho = rho;
         stats = applyStatsfun(problem0, xCur, storedb, key, options, stats);
     end
 

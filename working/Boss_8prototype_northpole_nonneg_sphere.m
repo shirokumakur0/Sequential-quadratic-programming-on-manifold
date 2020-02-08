@@ -51,8 +51,7 @@
 %          options.minstepsize = 1e-10;
      x0 = problem.M.rand();
 %          [xfinal, info] = almbddmultiplier(problem, x0, options);
-    options.trimhessian = "eye";
-    options.maxiter = 50;
+    options.trimhessian = "mineigval_manopt";
     % if you use sqp
     [x, xcost, info, options] = SQP(problem, x0, options); % #ok<ASGLU>    
     figure;

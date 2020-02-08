@@ -52,7 +52,9 @@ condet = constraintsdetail(problem);
         
     fprintf('Starting SQP\n');
     
-    [x, xcost, info] = sqp(problem, x0, options); % #ok<ASGLU>   
+    [x, xcost, info, options] = SQP(problem, x0, options); % #ok<ASGLU>
+    x;
+    
 
      
 %------------------------sub functions-----------     
