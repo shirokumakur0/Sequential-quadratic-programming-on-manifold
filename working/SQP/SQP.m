@@ -162,6 +162,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     localdefaults.lambdas = ones(problem0.condet.n_eq_constraint_cost, 1);    
     localdefaults.ls_max_steps  = 30;
     localdefaults.regularhesseigval = 1e-3;
+    localdefaults.ls_perturbation = 1e-4;
     
     % Merge global and local defaults, then merge w/ user options, if any.
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
@@ -186,7 +187,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     mus = options.mus; % initinal mus and lambdas for the Lagrangian
     lambdas = options.lambdas;
     rho = options.rho; % initinal rho for merit function
-    stepsize = 1; % initial stepsize for linesearch
+    % stepsize = 1; % initial stepsize for linesearch
     % lsstats = []; % Line-search stastics for recording in info.
     
     % For the initial savestats, declare some variables
@@ -362,13 +363,14 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         end
         
         % Compute the stepsize with the L1-type merit function and the Armijo rule
+        stepsize = 1;
         newx = meritproblem.M.retr(xCur, deltaXast, stepsize);
         newf = meritproblem.cost(newx);
         gammadf0 = options.gamma * df0;
         r = 0;
         lsmaxiterbreak = false;
         % descriptCost(meritproblem, xCur, deltaXast); % DEBUG only
-        while newf > ( f0 - gammadf0) && abs(newf - ( f0 - gammadf0)) > 10^(-4)
+        while newf > ( f0 - gammadf0) && abs(newf - ( f0 - gammadf0)) > options.ls_perturbation
             if r > options.ls_max_steps
                 lsmaxiterbreak = true;
                 break;
