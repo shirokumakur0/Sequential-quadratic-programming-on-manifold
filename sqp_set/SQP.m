@@ -144,10 +144,11 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     
     % Set localdefaults, a struct to be combined with argument options for
     % declaring hyperparameters.
-    localdefaults.maxiter = 1000;
+    localdefaults.maxiter = 10000000;
     localdefaults.maxtime = 3600;
     localdefaults.tolqpnorm = 1e-5;
-    localdefaults.tolgradnorm = 1e-6;
+    localdefaults.tolgradnorm = 1e-5;
+    localdefaults.toliterdist = 1e-5;
     % Hyperparameters for StoreDB
     localdefaults.storedepth = 3;
     % The way to treat the hessian matrix to be positive semidefinete.
@@ -163,7 +164,6 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     localdefaults.regularhesseigval = 1e-3;
     localdefaults.ls_perturbation = 1e-4;
     localdefaults.qp_verbosity = 0;
-    localdefaults.toliterdist = 1e-6;
     
     % Merge global and local defaults, then merge w/ user options, if any.
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
@@ -423,10 +423,10 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             fprintf('Legrangian Gradient norm tolerance reached \n');
             options.reason = "Legrangian Gradient norm tolerance reached";
             stop = true;
-        elseif qpsolnorm <= options.tolqpnorm
-            fprintf('QP solution norm with stepsize tolerance reached\n');
-            options.reason = "Legrangian Gradient norm tolerance reached";
-            stop = true;
+        %elseif qpsolnorm <= options.tolqpnorm
+        %    fprintf('QP solution norm with stepsize tolerance reached\n');
+        %    options.reason = "Legrangian Gradient norm tolerance reached";
+        %    stop = true;
         elseif iterdist <= options.toliterdist
             fprintf('Distance of iteration tolerance reached\n');
             options.reason = 'Distance of iteration tolerance reached';
@@ -446,24 +446,24 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     function stats = savestats()
         stats.iter = iter;
         stats.cost = xCurCost;
-        stats.gradnorm = xCurLagGradNorm;
+        %stats.gradnorm = xCurLagGradNorm;
         if iter == 0
             stats.time = toc(timetic);
-            stats.qpsolnorm = NaN;
-            stats.stepsize = NaN;
-            stats.lsmaxiterbreak = NaN;
-            stats.dist =  NaN;
+            % stats.qpsolnorm = NaN;
+            % stats.stepsize = NaN;
+            % stats.lsmaxiterbreak = NaN;
+            % stats.dist =  NaN;
             stats.qpexitflag = NaN;
         else
-            stats.time = toc(timetic);
-            % stats.time = info(iter).time + toc(timetic);
-            stats.qpsolnorm = qpsolnorm;
-            stats.stepsize = stepsize;
-            stats.lsmaxiterbreak = lsmaxiterbreak;
-            stats.dist = iterdist;
+            % stats.time = toc(timetic);
+            stats.time = info(iter).time + toc(timetic);
+            % stats.qpsolnorm = qpsolnorm;
+            % stats.stepsize = stepsize;
+            % stats.lsmaxiterbreak = lsmaxiterbreak;
+            % stats.dist = iterdist;
             stats.qpexitflag = qpexitflag;
         end
-        stats.rho = rho;
+        % stats.rho = rho;
         [stats.maxviolation, stats.meanviolation] = const_evaluation(xCur);
         stats = applyStatsfun(problem0, xCur, storedb, key, options, stats);
     end

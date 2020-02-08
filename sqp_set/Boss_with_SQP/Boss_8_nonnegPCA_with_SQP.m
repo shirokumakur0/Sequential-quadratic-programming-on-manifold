@@ -4,7 +4,7 @@
 close all; clc; clear all;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
-dim_set = [10, 30, 50, 200, 500, 1000];  % Dimension of "the Cov Matrix"
+dim_set = [10, 25, 50, 75, 100];  % Dimension of "the Cov Matrix"
 snrset = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0]; % Signal Strength
 deltaset = [0.1, 0.3, 0.7, 0.9];           % Sparsity
 rank = 1;                                  % Rank of BM Relaxation. 1 if we don't.
@@ -30,11 +30,15 @@ for repeat = 1: n_repeat
                     Z(ii,ii) = randn * 2/sqrt(T);
                 end
                 X = X+Z;
+                setting.repeat = repeat;
+                setting.dim = dim;
+                setting.snr = snr;
+                setting.delta = delta;
 
                 %________Experiment_____
-                options.maxOuterIter = 10000000;
+                options.maxOuterIter = 10000;
                 options.maxtime = 3600;
-                options.minstepsize = 1e-10;
+                options.minstepsize = 1e-5;
                 
                 %Only do mini-sum-max for low dimensional data
                 if dim == dim_set(1)
@@ -43,7 +47,7 @@ for repeat = 1: n_repeat
                     specifier.ind = [0, 1, 1, 1, 1, 1];
                 end
 
-                result = clientconstraint_sphere_nonnegativePCA_with_SQP(X, rank, options, specifier);
+                result = clientconstraint_sphere_nonnegativePCA_with_SQP(X, rank, options, specifier, setting);
                 result = result(:);
                 param = [dim; snr; delta; repeat];
                 outputdata = [result; param]';

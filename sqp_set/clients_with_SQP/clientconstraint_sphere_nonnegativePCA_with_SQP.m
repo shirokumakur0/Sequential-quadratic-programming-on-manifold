@@ -1,4 +1,4 @@
-function data = clientconstraint_sphere_nonnegativePCA_with_SQP(X, rankY, methodoptions, specifier)
+function data = clientconstraint_sphere_nonnegativePCA_with_SQP(X, rankY, methodoptions, specifier, setting)
 %Y is a square matrix
 %rank is smaller than columns of Y
 [N, ~] = size(X);
@@ -59,6 +59,8 @@ condet = constraintsdetail(problem);
         timetic = tic();
         [xfinal, info] = exactpenaltyViaMinimax(problem, x0, options);
         time = toc(timetic);
+        filename = sprintf('NNPCA_Mini-Sum-Max_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
+        struct2csv(info, filename);
 
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
@@ -73,7 +75,8 @@ condet = constraintsdetail(problem);
         timetic = tic();
         [xfinal, info] = almbddmultiplier(problem, x0, options);
         time = toc(timetic);
-        
+        filename = sprintf('NNPCA_ALM_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
+        struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
         data(1, 2) = maxviolation;
@@ -87,7 +90,8 @@ condet = constraintsdetail(problem);
         timetic = tic();
         [xfinal, info] = exactpenaltyViaSmoothinglqh(problem, x0, options);
         time = toc(timetic);
-
+        filename = sprintf('NNPCA_LQH_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
+        struct2csv(info, filename);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
         data(1, 3) = maxviolation;
@@ -102,7 +106,8 @@ condet = constraintsdetail(problem);
         timetic = tic();
         [xfinal, info] = exactpenaltyViaSmoothinglse(problem, x0, options);
         time = toc(timetic);
-        
+        filename = sprintf('NNPCA_LSE_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
+        struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
         data(1, 4) = maxviolation;
@@ -126,9 +131,15 @@ condet = constraintsdetail(problem);
                 'StepTolerance', methodoptions.minstepsize);
         end
         timetic = tic();
+        history = struct();
+        history.iter = [];
+        history.cost = [];
+        %history.maxviolation = [];
+        %history.meanviolation = [];
         [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], zeros(N*rankY, 1), [], @nonlcon, options);
         time = toc(timetic);
-        
+        filename = sprintf('NNPCA_fmincon_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
+        struct2csv(history, filename);              
         xfinal = reshape(xfinal, [N, rankY]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         data(1, 5) = output.constrviolation;
@@ -142,7 +153,8 @@ condet = constraintsdetail(problem);
         timetic = tic();
         [xfinal, costfinal, info, options] = SQP(problem, x0, options);
         time = toc(timetic);
-        
+        filename = sprintf('NNPCA_SQP_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
+        struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
         data(1, 6) = maxviolation;
@@ -156,6 +168,9 @@ condet = constraintsdetail(problem);
         if toc(timetic) > methodoptions.maxtime
             stop = true;
         end
+        history.iter = [history.iter; optimValues.iteration];
+        history.cost = [history.cost;optimValues.fval];
+        %[history.maxviolation, history.meanviolation, cost] = evaluation(problem, x, condet);
     end 
      
      
