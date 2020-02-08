@@ -53,11 +53,18 @@
 %          [xfinal, info] = almbddmultiplier(problem, x0, options);
     options.trimhessian = "mineigval_manopt";
     % if you use sqp
-     [x, xcost, info] = sqp(problem, x0, options); % #ok<ASGLU>    
+    [x, xcost, info, options] = SQP(problem, x0, options); % #ok<ASGLU>    
+    figure;
+    semilogy([info.iter], [info.cost], '.-');
+    xlabel('Iteration #');
+    ylabel('cost');
+    
+    
+    [Primx, Primxcost, Priminfo, Primoptions] = sqp(problem, x0, options);
     
     % Display some statistics.
     figure;
-    semilogy([info.iter], [info.cost], '.-');
+    semilogy([Priminfo.iter], [Priminfo.cost], '.-');
     xlabel('Iteration #');
     ylabel('cost');
     title('Convergence of the sqp algorithm on the nonnegative sphere');

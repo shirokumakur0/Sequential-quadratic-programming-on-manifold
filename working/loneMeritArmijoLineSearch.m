@@ -4,7 +4,7 @@ function [stepsize, newx] = loneMeritArmijoLineSearch(meritproblem, xCur, deltaX
     newf = meritproblem.cost(newx);
     gammadf0 = options.gamma * df0;
     r = 0;
-    descriptCost(meritproblem, xCur, deltaXast);
+    % descriptCost(meritproblem, xCur, deltaXast); DUBUG ONLY
     while newf > ( f0 - gammadf0) && abs(newf - ( f0 - gammadf0)) > 10^(-4)     
         % && r<= options.ls_max_steps
         r = r + 1;

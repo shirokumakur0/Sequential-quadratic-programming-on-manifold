@@ -1,4 +1,13 @@
-function [xfinal, costfinal, info, options] = sqp(problem0, x0, options)
+% NOTICE IMPORTANT: this file is abandoned because the algorithm itself is
+% insufficient to solve the problem appropriately: when we solve
+% subproblems, we use ALM (that's why the file name is sqpALM), which doen't
+% return any information for the Lagrange multipliers of the original
+% problem. Hence, we can't get any  proficient results from the alg..
+
+function [xfinal, cost, info] = sqpALM(problem0, x0, options)
+% TODO: function [x, cost, info,options] = sqponmani(problem0, x0, options)
+% This is the sqp algorithm with augumented Lagrangian method.
+
 % Sequential Quadratic Programming solver for smooth objective functions 
 % on Riemannian manifolds.
 %
@@ -10,8 +19,7 @@ function [xfinal, costfinal, info, options] = sqp(problem0, x0, options)
 % This is a Sequential Qudratic Programming solver for mixed constraints problems
 % on Riemannian manifolds, which aims to minimize the cost function
 % in the given problem structure with (in)equality constraints.
-% It requires access to the gradient and the Hessian of the cost function
-% and the constraints.
+% It requires access to the gradient and the Hessian of the cost function.
 %
 % For a description of the algorithm and theorems offering convergence
 % guarantees, see the references below.
@@ -36,6 +44,9 @@ function [xfinal, costfinal, info, options] = sqp(problem0, x0, options)
 %       The total elapsed time in seconds to reach the corresponding cost.
 %	stepsize (double)
 %       The size of the step from the previous to the new iterate.
+%   accepted (boolean)
+%       1 if the current step is accepted in the cautious update. 0 otherwise
+%   And possibly additional information logged by options.statsfun.
 % For example, type [info.gradnorm] to obtain a vector of the successive
 % gradient norms reached at each iteration.
 %
@@ -57,7 +68,7 @@ function [xfinal, costfinal, info, options] = sqp(problem0, x0, options)
 %       stopping criterion triggers).
 %   maxiter (1000)
 %       The algorithm terminates if maxiter iterations were executed.
-%   maxtime (3600)
+%   maxtime (Inf)
 %       The algorithm terminates if maxtime seconds elapsed.
 %   minstepsize (1e-10)
 %     The minimum norm of the tangent vector that points from the current
@@ -93,7 +104,7 @@ function [xfinal, costfinal, info, options] = sqp(problem0, x0, options)
 %       that these additional computations appear in the algorithm timings
 %       too, and may interfere with operations such as counting the number
 %       of cost , etc. (the debug calls get storedb too).
-%   storedepth (10)
+%   storedepth (30)
 %       Maximum number of different points x of the manifold for which a
 %       store structure will be kept in memory in the storedb. If the
 %       caching features of Manopt are not used, this is irrelevant. If
@@ -124,10 +135,23 @@ function [xfinal, costfinal, info, options] = sqp(problem0, x0, options)
 %           localdefaults.strict_inc_func 
 
     % Verify that the problem description is sufficient for the solver.
-    problem0 = checkDifferentiability(problem0);
+    if ~canGetCost(problem0)
+        warning('manopt:getCost', ...
+            'No cost provided. The algorithm will likely abort.');
+    end
+    if ~canGetGradient(problem0) && ~canGetApproxGradient(problem0)
+        % Note: we do not give a warning if an approximate gradient is
+        % explicitly given in the problem description, as in that case the user
+        % seems to be aware of the issue.
+        warning('manopt:getGradient:approx', ...
+           ['No gradient provided. Using an FD approximation instead (slow).\n' ...
+            'It may be necessary to increase options.tolgradnorm.\n' ...
+            'To disable this warning: warning(''off'', ''manopt:getGradient:approx'')']);
+        problem0.approxgrad = approxgradientFD(problem0);
+    end
     
-    % If the struct 'problem0' does not have a condet field (which is an
-    % expected situation), add it to the problem0 here.
+    % If the struct 'problem0' does not have a condet field (and it is a
+    % expected situation), add the field to the problem0 here.
     if ~isfield(problem0, 'condet')
         problem0.condet = constraintsdetail(problem0);
     end
@@ -137,7 +161,11 @@ function [xfinal, costfinal, info, options] = sqp(problem0, x0, options)
     localdefaults = setLocalDefaults(problem0);
     
     % Merge global and local defaults, then merge w/ user options, if any.
-    options = trimOptions(options, localdefaults);
+    localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
+    if ~exist('options', 'var') || isempty(options)
+        options = struct();
+    end
+    options = mergeOptions(localdefaults, options);
     
     % Create a random starting point if no starting point is provided.
     if ~exist('x0', 'var')|| isempty(x0)
@@ -146,15 +174,24 @@ function [xfinal, costfinal, info, options] = sqp(problem0, x0, options)
         xCur = x0;
     end
     
-    % Up to  here, the codes except condet are borrowed from manopt and 
-    % preceding works. Now, we added the followings for SQP on manifolds.
+    % Up to  here, the codes are borrowed from manopt and preceding works.
+    % Now, we added the followings for SQP on manifolds.
     
+    % Get the canonical basis corresponding with the manifold. We use this
+    % for vectorizing gradients and make Hessianmatrix, both of which are
+    % applied with Riemannian metrics.
+    % NOTICE: The function only assume the case that the tangent spaces
+    % of M have the same basis as that of M. For more detail, please check 
+    % makeCanonicalBasis.m.
+    % basis = makeCanonicalBasis(problem0);
+  
     % Create a store database and get a key for the current x
     storedb = StoreDB(options.storedepth);
     key = storedb.getNewKey();
     
-    % create some initial variables which will be used in the following
-    % loop.
+    % __Initialization of variables__
+    % create some variables which will be used in the following loop.
+    % M = problem0.M; % to make a subproblem on the manifold.
     mus = options.mus; % initinal mus and lambdas for the Lagrangian
     lambdas = options.lambdas;
     rho = options.rho; % initinal rho for merit function
@@ -163,91 +200,91 @@ function [xfinal, costfinal, info, options] = sqp(problem0, x0, options)
     
     % For the initial savestats, declare some variables
     iter = 0;
-    timetic = tic();
+    timetic =tic();
     [xCurCost, xCurGradient] = getCostGrad(problem0, xCur, storedb, key);
     xCurGradNorm = problem0.M.norm(xCur, xCurGradient);
-    
     % Save stats in a struct array info, and preallocate.
     stats = savestats();
     info(1) = stats;
-    info(min(10000, options.maxiter+1)).iter = [];
-    
-    % Set totaltime for a stop criterion
+    info(min(10000, options.maxouteriter+1)).iter = [];
+       
     totaltime = tic();
     
     % Main loop where we solve subproblems iteratively
-    for iter = 1:options.maxiter
+    for iter = 1:options.maxouteriter
 
-        if options.verbosity >= 2
-            fprintf('Iteration: %d, Cost: %f \n', iter, xCurCost);
-        end
+        %         if options.verbosity >= 2
+        %             fprintf(' iter                   cost val            grad. norm           alpha\n');
+        %         end
 
         timetic = tic();
 
         % Get current Hessian and gradient of the cost function.
-        % Also, make a "qpinfo" structure stading for the subproblem
+        % Also, make a "problem" structure stading for the subproblem
         % at the current point.
-        qpinfo = makeQPInfo(problem0, xCur, mus, lambdas, options);
-        
-        % Trim qpinfo.H (Hessian matrix) in some way, say, regularizeing
-        % according to the minimum eigenvalue of Hessian obtained in some way
-        % or replacing it with the identity matrix
-        qpinfo = trimHessianMatrix(qpinfo, options);
+        fprintf('Iteration: %d     ', iter);
+        subproblem = makeSubQuadraticModelonTangentSpace(problem0, xCur, mus, lambdas);
 
-        % Compute the direction and Lagrange multipliers
-        % by solving QP with quadprog, a matlab solver for QP
-        [coeff, ~, ~, ~, Lagmultipliers] = quadprog(qpinfo.H, qpinfo.f,...
-            qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq);
-        
-        deltaXast = 0;
-        for i = 1:qpinfo.n
-            deltaXast = deltaXast + coeff(i)* qpinfo.basis{i};
-        end
-        
+         % Compute the direction and Lagrange multipliers
+         % by solving QP with quadprog, a matlab solver for QP
+         [deltaXast, innerinfo] = almbddmultiplier(subproblem, xCur, options);
+         % RECONSIDER ABOVE
+         Lagmultipliers.ineqlin = innerinfo(end).lambdas;
+         Lagmultipliers.eqlin = innerinfo(end).gammas;
+
         % Update rho, a penalty parameter, if needed.
-        rho = updateRho(rho, Lagmultipliers, problem0);
-        
-        % make a struct and some variables for loneArmijoLineSearch
-        [meritproblem, f0, df0] = makeMeritProblem(problem0, xCur, rho,...
-            deltaXast, mus, lambdas);
-        
+        newacc = 0;
+
+        for iterineq = 1 : problem0.condet.n_ineq_constraint_cost
+            newacc = max(newacc, Lagmultipliers.ineqlin(iterineq));
+        end
+        for itereq = 1 : problem0.condet.n_eq_constraint_cost
+            newacc = max(newacc, abs(Lagmultipliers.eqlin(itereq)));
+        end
+
+        if rho < newacc
+           rho = newacc;
+        end
+
+        % make the struct 'meritproblem', which consists of the L1 merit function
+        % as meritproblem.cost, M as meritproble.M (for M.retr), and rho,tau,,
+        f0 = loneMeritFunction(problem0, xCur, rho);
+        df0 = fval - problem.M.inner(xCur, subproblem.grad(xCur),deltaXast);
+
         % Compute the stepsize with the L1-type merit function and the Armijo
         % rule
         % TODO: the return values rom loneMeritArmijoLineSearch should be 
         % [stepsize, newx, newkey, lsstats] for speeding up.
-        [stepsize, newx] = loneMeritArmijoLineSearch(meritproblem, xCur,...
-            deltaXast, f0, df0, options);
-
+        [stepsize, newx] = loneMeritArmijoLineSearch(problem0,rho,...
+                                                            xCur,deltaXast,f0,df0,options);
+        
         % Update variables to new iterate
         xPrev = xCur;
         xCur = newx;
         mus = Lagmultipliers.ineqlin;
-        lambdas =  Lagmultipliers.eqlin;
+        lambdas = Lagmultipliers.eqlin;
         [xCurCost, xCurGradient] = getCostGrad(problem0, xCur, storedb, key);
         xCurGradNorm = problem0.M.norm(xCur, xCurGradient);
-        
-        % save stats
         key = storedb.getNewKey();
+        % save stats
         stats = savestats();
-        info(iter+1) = stats;s
-        fprintf("stepsize:%f,   norm of deltaXast: %f",stepsize, problem0.M.norm(xPrev, deltaXast));
-        
+        info(iter+1) = stats;
                                                         
         % refer to stop criteria        
         if toc(totaltime) >= options.maxtime
-            fprintf('Max time exceeded\n');
+            fprintf('Max time exceeded');
             break
         elseif stepsize <= options.minstepsize
-            fprintf('Min stepsize exceeded\n');
+            fprintf('Min stepsize exceeded');
             break
         elseif problem0.M.norm(xPrev, deltaXast) <= options.tolgradnorm
-            fprintf('Tol grad norm exceeded\n');
+            fprintf('Tol grad norm exceeded');
             break
         end
     end
     
     xfinal = xCur;
-    costfinal = problem0.cost(xfinal);
+    cost = problem0.cost(xfinal);
     
     % Routine in charge of collecting the current iteration stats
     function stats = savestats()
@@ -258,11 +295,9 @@ function [xfinal, costfinal, info, options] = sqp(problem0, x0, options)
         if iter == 0
             stats.stepsize = NaN;
             stats.time = toc(timetic);
-            stats.deltaXastnorm = NaN;
         else
             stats.stepsize = stepsize;
             stats.time = info(iter).time + toc(timetic);
-            stats.deltaXastnorm = problem0.M.norm(xCur, deltaXast);
         end
         % stats.linesearch = lsstats;
         stats = applyStatsfun(problem0, xCur, storedb, key, options, stats);
