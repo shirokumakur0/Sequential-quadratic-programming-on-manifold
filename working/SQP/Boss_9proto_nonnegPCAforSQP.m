@@ -4,12 +4,15 @@
 close all; clc; clear all;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
-dim_set = [10, 50, 200, 500, 1000, 2000];  % Dimension of "the Cov Matrix"
-snrset = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0]; % Signal Strength
-deltaset = [0.1, 0.3, 0.7, 0.9];           % Sparsity
+%dim_set = [10, 50, 200, 500, 1000, 2000];  % Dimension of "the Cov Matrix"
+dim_set = [15];  % Dimension of "the Cov Matrix"
+%snrset = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0]; % Signal Strength
+snrset = [0.5];
+deltaset = [0.3];
+%deltaset = [0.1, 0.3, 0.7, 0.9];           % Sparsity
 rank = 1;                                  % Rank of BM Relaxation. 1 if we don't.
-n_repeat = 4;                              % Number of repeat experiment
-
+%n_repeat = 4;                              % Number of repeat experiment
+n_repeat = 1;
 for repeat = 1: n_repeat
     
     for dim = dim_set
@@ -32,6 +35,7 @@ for repeat = 1: n_repeat
                 X = X+Z;
 
                 %________Experiment_____
+                options.maxOuterIter = 300;
                 options.maxOuterIter = 10000000;
                 options.maxtime = 3600;
                 options.minstepsize = 1e-10;
@@ -43,13 +47,13 @@ for repeat = 1: n_repeat
                     specifier.ind = [0, 1, 1, 1, 1];
                 end
 
-                result = clientconstraint_sphere_nonnegativePCA_with_SQP(X, rank, options, specifier);
+                result = clientconstraint_sphere_nonnegativePCA_for_Boss_9(X, rank, options, specifier);
                 result = result(:);
                 param = [dim; snr; delta; repeat];
                 outputdata = [result; param]';
                 
-                filename = sprintf('zz_NNPCA_Dim%d.dat', dim);
-                dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
+                %filename = sprintf('zz_NNPCA_Dim%d.dat', dim);
+                %dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
             end
         end
     end

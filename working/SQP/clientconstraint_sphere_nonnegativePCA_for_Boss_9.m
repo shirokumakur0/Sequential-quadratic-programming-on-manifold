@@ -45,7 +45,7 @@ problem.ineq_constraint_hess = constraints_hess;
 %     Debug Only
 %     checkconstraints(problem)
 
-condet = constraintsdetail(problem);
+%condet = constraintsdetail(problem);
 
 %     ------------------------- Solving ---------------------------
     options = methodoptions;
