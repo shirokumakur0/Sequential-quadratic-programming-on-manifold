@@ -75,14 +75,20 @@ function checkconstraints_upto2ndorder(problem, x0, d)
         newproblem.ehess = problem.ineq_constraint_hess{iter};
         if has_x
             if has_d
+                figure;
                 checkgradient(newproblem, x0, d);
+                figure;
                 checkhessian(newproblem, x0, d);
             else
+                figure;
                 checkgradient(newproblem, x0);
+                figure;
                 checkhessian(newproblem, x0);
             end
         else
+            figure;
             checkgradient(newproblem);
+            figure;
             checkhessian(newproblem);
         end
     end
@@ -94,14 +100,20 @@ function checkconstraints_upto2ndorder(problem, x0, d)
         newproblem.ehess = problem.eq_constraint_hess{iter};
         if has_x
             if has_d
+                figure;
                 checkgradient(newproblem, x0, d);
+                figure;
                 checkhessian(newproble, x0, d);
             else
+                figure;
                 checkgradient(newproblem, x0);
+                figure;
                 checkhessian(newproblem, x0);
             end
         else
+            figure;
             checkgradient(newproblem);
+            figure;
             checkhessian(newproblem);
         end
     end  

@@ -91,11 +91,15 @@ function [x, cost, info, options] = bfgsnonsmoothminimax(problem, x0, options)
         %------------------------ROUTINE----------------------------
         if restart
             if ultimatum
-                fprintf('Refreshing Does not help anymore\n');
+                if options.verbosity >= 2
+                    fprintf('Refreshing Does not help anymore\n');
+                end
                 break;
             else
                 scaleFactor = 1;
-                fprintf('Restarting..\n');
+                if options.verbosity >= 2
+                    fprintf('Restarting..\n');
+                end
                 k = 0;
                 P_operator = @(v) P_operate(M, xCur, v, sHistory, yHistory, rhoHistory, scaleFactor, min(k, options.memory));
                 xCurGradient = problem.subgrad(xCur, options.epsilon, P_operator);
@@ -129,7 +133,9 @@ function [x, cost, info, options] = bfgsnonsmoothminimax(problem, x0, options)
         if xCurGradNorm^2 <= options.delta
             options.epsilon = options.epsilon * options.theta_epsilon;
             options.delta = options.delta * options.theta_delta;
-            fprintf('epsilon is now %.16e', options.epsilon);
+            if options.verbosity >= 2
+                fprintf('epsilon is now %.16e', options.epsilon);
+            end
             P_operator = @(v) P_operate(M, xCur, v, sHistory, yHistory, rhoHistory, scaleFactor, min(k, options.memory));
             xCurGradient = problem.subgrad(xCur, options.epsilon, P_operator);
             xCurGradNorm = M.norm(xCur, xCurGradient);

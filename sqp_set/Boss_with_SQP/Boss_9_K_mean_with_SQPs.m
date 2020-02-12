@@ -25,23 +25,31 @@ for repeat = 1: n_repeat
         D = data*data.';
 
         %________Experiment_____
-        options.maxOuterIter = 10000000;
+        options.maxOuterIter = 5000;
         options.maxtime = 3600;
-        options.minstepsize = 1e-10;
+        options.minstepsize = 1e-5;
+        options.verbosity = 1;
+        %________Setting________
+        setting.filename = filename;
+        setting.rank = rank;
+        setting.maxOuterIter = options.maxOuterIter;
+        setting.maxtime = options.maxtime;
+        setting.minstepsize = options.minstepsize;
+        setting.verbosity = options.verbosity;
         
         % Only do mini-sum-max for low dimensional data
         if dataset <= 1
-            specifier.ind = ones(5,1);
+            specifier.ind = ones(7,1);
         else
-            specifier.ind = [0, 1, 1, 1, 1];
+            specifier.ind = [0, 1, 1, 1, 1, 1, 1];
         end
         
-        result = clientconstraint_stiefel_Kmeans(D, rank, options, specifier);
+        result = clientconstraint_stiefel_Kmeans_with_SQP(D, rank, options, specifier, setting);
         result = result(:);
         param = [dataset; repeat];
         outputdata = [result; param]';
         
-        filename = sprintf('zz_KM.dat');
+        filename = sprintf('with_SQP_zz_KM.dat');
         dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
     end
     

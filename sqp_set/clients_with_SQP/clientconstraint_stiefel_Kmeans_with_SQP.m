@@ -1,4 +1,4 @@
- function data = clientconstraint_stiefel_Kmeans(D, rankY, methodoptions, specifier)
+ function data = clientconstraint_stiefel_Kmeans(D, rankY, methodoptions, specifier, setting)
 % D has to be symmetric. 
 % rankY is positive integer
 % returned table:

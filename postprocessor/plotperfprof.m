@@ -7,51 +7,50 @@ function plotperfprof
 
     
     % BC 
-    filenames = ["zz_BC_Dim50.dat", "zz_BC_Dim200.dat",...
-        "zz_BC_Dim500.dat", "zz_BC_Dim1000.dat", ...
-        "zz_BC_Dim2000.dat", "zz_BC_Dim5000.dat"];
+    %filenames = ["zz_BC_Dim50.dat", "zz_BC_Dim200.dat",...
+    %    "zz_BC_Dim500.dat", "zz_BC_Dim1000.dat", ...
+    %    "zz_BC_Dim2000.dat", "zz_BC_Dim5000.dat"];
     %filenames = ["zz_BC_Dim50MSe7.dat", "zz_BC_Dim200MSe7.dat",...
     %    "zz_BC_Dim500MSe7.dat", "zz_BC_Dim1000MSe7.dat", ...
     %    "zz_BC_Dim2000MSe7.dat", "zz_BC_Dim5000MSe7.dat"];
-    titlenames = ["Dimension 50", "Dimension 200",...
-        "Dimension 500", "Dimension 1000",...
-        "Dimension 2000", "Dimension 5000"];
-    locs = {'southeast','southeast','southeast','southeast','southeast','northwest'};
+    %titlenames = ["Dimension 50", "Dimension 200",...
+    %    "Dimension 500", "Dimension 1000",...
+    %    "Dimension 2000", "Dimension 5000"];
+    %locs = {'southeast','southeast','southeast','southeast','southeast','northwest'};
     
     
     
     %NNPCA
-    filenames = ["zz_NNPCA_Dim10.dat", "zz_NNPCA_Dim50.dat",...
-        "zz_NNPCA_Dim200.dat", "zz_NNPCA_Dim500.dat", ...
-        "zz_NNPCA_Dim1000.dat", "zz_NNPCA_Dim2000.dat"];
-    titlenames = ["Dimension 10", "Dimension 50", "Dimension 200",...
-        "Dimension 500", "Dimension 1000",...
-        "Dimension 2000"];
-    locs = {'southeast','southeast','southeast','southeast','southeast','southeast'};
+    filenames = ["with_SQP_zz_NNPCA_Dim10.dat", "with_SQP_zz_NNPCA_Dim25.dat",...
+        "with_SQP_zz_NNPCA_Dim50.dat", "with_SQP_zz_NNPCA_Dim75.dat", ...
+        "with_SQP_zz_NNPCA_Dim100.dat"];
+    titlenames = ["Dimension 10", "Dimension 25", "Dimension 50",...
+        "Dimension 75", "Dimension 100"];
+    locs = {'southeast','southeast','southeast','southeast','southeast'};
     
     
     
     startingsolver = [1 2 2 2 2 2];
     fig = figure;
     
-    for plotnum = 1:6
+    for plotnum = 1:5
     
         filename = filenames{plotnum};
 
         data = csvread(filename);
         [nrow, ~] = size(data);
 
-        T = zeros(nrow, 5);
+        T = zeros(nrow, 7);
         for ii = 1 : nrow
-            extable = data(ii, 1 : 15);
+            extable = data(ii, 1 : 21);
             extable = extable';
-            extable = reshape(extable, [3, 5]);
+            extable = reshape(extable, [3, 7]);
             extable(extable == 0) = eps;
             [T(ii, :), ~,~,~] = timeplotprof(extable, ftol, constrtol);
         end
 
         subplot(3,2,plotnum) 
-        perf(T(:,startingsolver(plotnum):5), 1, plotnum);
+        perf(T(:,startingsolver(plotnum):7), 1, plotnum);
     end
     
     
@@ -69,9 +68,9 @@ function plotperfprof
               0.75 0.75 0;
               0.25 0.25 0.25];
         
-        lines = {'--' '-' '-.' '-' '--'};
+        lines = {'--' '-' '-.' '-' '--' '--'};
        
-        markers = [' ' ' ' ' ' ' ' ' ' '.' '.'];
+        markers = [' ' ' ' ' ' ' ' ' ' '.' '.' ' '];
        
         [np,ns] = size(T);
         minperf = min(T, [], 2);
@@ -91,10 +90,10 @@ function plotperfprof
         
         disp(r)
         
-        if ns == 5
+        if ns == 7
             r = circshift(r, [0,-1]);
         end
-        if ns == 5
+        if ns == 7
             for s = 1: ns
                 [xs, ys] = stairs(r(:,s), [1 : np]/np);
                 plot(xs, ys, 'LineStyle', lines{s});
@@ -113,10 +112,10 @@ function plotperfprof
         %axis([ 0 2*(max_ratio)+0.01 0 1 ]);
         
         
-        if ns == 5
-            legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon', 'REPMSD'},'Location',locs{plotnum},'Interpreter','latex');
+        if ns == 6
+            legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon', 'REPMSD','SQP'},'Location',locs{plotnum},'Interpreter','latex');
         else
-            legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon'},'Location',locs{plotnum},'Interpreter','latex');
+            legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon','SQP'},'Location',locs{plotnum},'Interpreter','latex');
         end
         ylabel('Performance Profile');
         xlabel('$$\log_2\tau$','Interpreter','latex');

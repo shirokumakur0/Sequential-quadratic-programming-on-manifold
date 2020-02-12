@@ -144,7 +144,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     
     % Set localdefaults, a struct to be combined with argument options for
     % declaring hyperparameters.
-    localdefaults.maxiter = 10000000;
+    localdefaults.maxiter = 5000;
     localdefaults.maxtime = 3600;
     localdefaults.tolqpnorm = 1e-5;
     localdefaults.tolgradnorm = 1e-5;
@@ -153,6 +153,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     localdefaults.storedepth = 3;
     % The way to treat the hessian matrix to be positive semidefinete.
     localdefaults.trimhessian = 'mineigval_manopt';
+    localdefaults.trimhess_perturbation = 0;
     % Initial parameters for the merit function and the Lagrangian
     localdefaults.tau = 0.8;  % TODO: should find an appropriate value as long as tau > 0
     localdefaults.rho = 1;  % TODO: should find an appropriate value as long as rho > 0
@@ -163,6 +164,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     localdefaults.ls_max_steps  = 30;
     localdefaults.regularhesseigval = 1e-3;
     localdefaults.ls_perturbation = 1e-4;
+    localdefaults.verbosity = 1;
     localdefaults.qp_verbosity = 0;
     
     % Merge global and local defaults, then merge w/ user options, if any.
@@ -219,8 +221,11 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         
         if options.verbosity >= 2
             fprintf('Iter: %d, Cost: %f, LagGradNorm: %f \n', iter, xCurCost, xCurLagGradNorm);
+        elseif options.verbosity == 1
+            if mod(iter, 100) == 0 && iter ~= 0
+                fprintf('Iter: %d, Cost: %f, LagGradNorm: %f \n', iter, xCurCost, xCurLagGradNorm);
+            end
         end
-
         iter = iter + 1;
         
         timetic = tic();
@@ -228,7 +233,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         % Get current Hessian and gradient of the cost function.
         % Also, make a "qpinfo" structure stading for the subproblem
         % at the current point.
-        costLag = @(X) costLagrangian(X, mus, lambdas); % though we don't use here.
+        
+        costLag = @(X) costLagrangian(X, mus, lambdas); % which we';; use in hessextreme
         gradLag = @(X) gradLagrangian(X, mus, lambdas); % in the tangent space
         hessLag = @(X, d) hessLagrangian(X, d, mus, lambdas); % in the tangent space
 
@@ -253,7 +259,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         % make inequality constraints
         if problem0.condet.has_ineq_cost
             row = problem0.condet.n_ineq_constraint_cost;
-            col = numel(basis);
+            col = qpinfo.n;
             A = zeros(row, col);
             b = zeros(row, 1);
             for ineqrow = 1:row
@@ -263,7 +269,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
                 constraint_egrad = gradhandle(xCur);
                 constraint_grad = problem0.M.egrad2rgrad(xCur, constraint_egrad);
                 for ineqcol = 1:col
-                    base = basis{ineqcol};
+                    base = qpinfo.basis{ineqcol};
                     A(ineqrow,ineqcol) = problem0.M.inner(xCur, constraint_grad, base);
                 end
             end
@@ -277,7 +283,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         % make equality constraints
         if problem0.condet.has_eq_cost
             row = problem0.condet.n_eq_constraint_cost;
-            col = numel(basis);
+            col = qpinfo.n;
             Aeq = zeros(row, col);
             beq = zeros(row, 1);
             for eqrow = 1:row
@@ -287,7 +293,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
                 constraint_egrad = gradhandle(xCur);
                 constraint_grad = problem0.M.egrad2rgrad(xCur, constraint_egrad);
                 for eqcol = 1:col
-                    base = basis{eqcol};
+                    base = qpinfo.basis{eqcol};
                     Aeq(eqrow,eqcol) = problem0.M.inner(xCur, constraint_grad, base);
                 end
             end
@@ -308,7 +314,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             qpinfo.mineigval = min(eigval);
             if qpinfo.mineigval < 0
                 qpinfo.regularmineigval= max(options.regularhesseigval, abs(qpinfo.mineigval));
-                qpinfo.H = qpinfo.H + qpinfo.regularmineigval * eye(qpinfo.n);
+                qpinfo.H = qpinfo.H + (qpinfo.regularmineigval + options.trimhess_perturbation )* eye(qpinfo.n);
             end
         elseif strcmp(options.trimhessian, 'mineigval_manopt')
             % the difference between mineiegval_manopt and mineigval_matlab is
@@ -320,7 +326,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             [~ ,qpinfo.mineigval] = hessianextreme(auxproblem, xCur);
             if qpinfo.mineigval < 0
                 qpinfo.regularmineigval = max(options.regularhesseigval, abs(qpinfo.mineigval));
-                qpinfo.H = qpinfo.H + qpinfo.regularmineigval * eye(qpinfo.n);
+                qpinfo.H = qpinfo.H + (qpinfo.regularmineigval + options.trimhess_perturbation) * eye(qpinfo.n);
             end
         end
         
@@ -449,18 +455,18 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         %stats.gradnorm = xCurLagGradNorm;
         if iter == 0
             stats.time = toc(timetic);
-            % stats.qpsolnorm = NaN;
-            % stats.stepsize = NaN;
-            % stats.lsmaxiterbreak = NaN;
-            % stats.dist =  NaN;
+            stats.qpsolnorm = NaN;
+            stats.stepsize = NaN;
+            stats.lsmaxiterbreak = NaN;
+            stats.dist =  NaN;
             stats.qpexitflag = NaN;
         else
-            % stats.time = toc(timetic);
+            stats.time = toc(timetic);
             stats.time = info(iter).time + toc(timetic);
-            % stats.qpsolnorm = qpsolnorm;
-            % stats.stepsize = stepsize;
-            % stats.lsmaxiterbreak = lsmaxiterbreak;
-            % stats.dist = iterdist;
+            stats.qpsolnorm = qpsolnorm;
+            stats.stepsize = stepsize;
+            stats.lsmaxiterbreak = lsmaxiterbreak;
+            stats.dist = iterdist;
             stats.qpexitflag = qpexitflag;
         end
         % stats.rho = rho;

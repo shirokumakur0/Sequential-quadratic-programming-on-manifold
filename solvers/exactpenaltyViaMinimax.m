@@ -40,7 +40,9 @@ function [xfinal,info] = exactpenaltyViaMinimax (problem0, x0, options)
     
     for OuterIter = 1 : options.maxOuterIter
         timetic = tic();
-        fprintf('Iteration: %d    ', OuterIter);
+        if mod(OuterIter, 100) == 0 
+            fprintf('Iteration: %d    ', OuterIter);
+        end
         costfun = @(X) cost_exactpenalty(X, problem0, rho);
         gradfun = @(X) grad_exactpenalty(X, problem0, rho);
         problem.cost = costfun;
@@ -66,8 +68,9 @@ function [xfinal,info] = exactpenaltyViaMinimax (problem0, x0, options)
         
         epsilon  = max(options.endingepsilon, theta_epsilon * epsilon);
         tolgradnorm = max(options.endingtolgradnorm, tolgradnorm * thetatolgradnorm);
-        
-        fprintf('FroNormStepDiff: %.16e\n', norm(xPrev-xCur,'fro'))
+        if mod(OuterIter, 100) == 0 
+            fprintf('FroNormStepDiff: %.16e\n', norm(xPrev-xCur,'fro'))
+        end        
         if norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm && epsilon <=options.endingepsilon
             break;
         end

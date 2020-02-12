@@ -42,7 +42,9 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
     
     for OuterIter = 1 : options.maxOuterIter
         timetic = tic();
-        fprintf('Iteration: %d     ', OuterIter);
+        if mod(OuterIter, 100) == 0 
+            fprintf('Iteration: %d    ', OuterIter);
+        end
         costfun = @(X) cost_alm(X, problem0, rho, lambdas, gammas);
         gradfun = @(X) grad_alm(X, problem0, rho, lambdas, gammas);
         problem.cost = costfun;
@@ -80,8 +82,9 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
         %Save stats
         stats = savestats(xCur);
         info(OuterIter+1) = stats;
-        
-        fprintf('FroNormStepDiff: %.16e\n', norm(xPrev-xCur,'fro'))
+        if mod(OuterIter, 100) == 0 
+            fprintf('FroNormStepDiff: %.16e\n', norm(xPrev-xCur,'fro'))
+        end
         if norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
             break;
         end
