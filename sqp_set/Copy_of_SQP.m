@@ -120,29 +120,27 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
 %           deleted codes on localdefaults.tolgradnorm and 
 %           localdefaults.strict_inc_func 
 
-    % % Verify that the problem description is sufficient for the solver.
-    % if ~canGetCost(problem0)
-    %     warning('manopt:getCost', ...
-    %         'No cost provided. The algorithm will likely abort.');
-    % end
-    % if ~canGetGradient(problem0) && ~canGetApproxGradient(problem0)
-    %     % Note: we do not give a warning if an approximate gradient is
-    %     % explicitly given in the problem description, as in that case the user
-    %     % seems to be aware of the issue.
-    %     warning('manopt:getGradient:approx', ...
-    %        ['No gradient provided. Using an FD approximation instead (slow).\n' ...
-    %         'It may be necessary to increase options.tolgradnorm.\n' ...
-    %         'To disable this warning: warning(''off'', ''manopt:getGradient:approx'')']);
-    %     problem0.approxgrad = approxgradientFD(problem0);
-    % end
+    % Verify that the problem description is sufficient for the solver.
+    if ~canGetCost(problem0)
+        warning('manopt:getCost', ...
+            'No cost provided. The algorithm will likely abort.');
+    end
+    if ~canGetGradient(problem0) && ~canGetApproxGradient(problem0)
+        % Note: we do not give a warning if an approximate gradient is
+        % explicitly given in the problem description, as in that case the user
+        % seems to be aware of the issue.
+        warning('manopt:getGradient:approx', ...
+           ['No gradient provided. Using an FD approximation instead (slow).\n' ...
+            'It may be necessary to increase options.tolgradnorm.\n' ...
+            'To disable this warning: warning(''off'', ''manopt:getGradient:approx'')']);
+        problem0.approxgrad = approxgradientFD(problem0);
+   end
     
     % If the struct 'problem0' does not have a condet field (which is an
     % expected situation), add it to the problem0 here.
-    %if ~isfield(problem0, 'condet')
-    %    problem0.condet = constraintsdetail(problem0);
-    %end
-    
-    condet = constraintsdetail(problem0);
+    if ~isfield(problem0, 'condet')
+        problem0.condet = sqp_constraintsdetail(problem0);
+    end
     
     % Set localdefaults, a struct to be combined with argument options for
     % declaring hyperparameters.
@@ -161,8 +159,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     localdefaults.rho = 1;  % TODO: should find an appropriate value as long as rho > 0
     localdefaults.beta = 0.5;  % TODO: should find an appropriate value as long as 1 > beta > 0
     localdefaults.gamma = 0.5; % TODO: should find an appropriate value as long as 1 > gamma > 0  
-    localdefaults.mus = ones(condet.n_ineq_constraint_cost, 1);
-    localdefaults.lambdas = ones(condet.n_eq_constraint_cost, 1);    
+    localdefaults.mus = ones(problem0.condet.n_ineq_constraint_cost, 1);
+    localdefaults.lambdas = ones(problem0.condet.n_eq_constraint_cost, 1);    
     localdefaults.ls_max_steps  = 30;
     localdefaults.regularhesseigval = 1e-3;
     localdefaults.ls_perturbation = 1e-4;
@@ -259,8 +257,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         qpinfo.f = f;
 
         % make inequality constraints
-        if condet.has_ineq_cost
-            row = condet.n_ineq_constraint_cost;
+        if problem0.condet.has_ineq_cost
+            row = problem0.condet.n_ineq_constraint_cost;
             col = qpinfo.n;
             A = zeros(row, col);
             b = zeros(row, 1);
@@ -283,8 +281,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         qpinfo.b = b;
 
         % make equality constraints
-        if condet.has_eq_cost
-            row = condet.n_eq_constraint_cost;
+        if problem0.condet.has_eq_cost
+            row = problem0.condet.n_eq_constraint_cost;
             col = qpinfo.n;
             Aeq = zeros(row, col);
             beq = zeros(row, 1);
@@ -345,11 +343,11 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         
         % Update rho, a penalty parameter, if needed.
         newacc = 0;
-        for iterineq = 1 : condet.n_ineq_constraint_cost
+        for iterineq = 1 : problem0.condet.n_ineq_constraint_cost
             newacc = max(newacc, Lagmultipliers.ineqlin(iterineq));
         end
         
-        for itereq = 1 : condet.n_eq_constraint_cost
+        for itereq = 1 : problem0.condet.n_eq_constraint_cost
             newacc = max(newacc, abs(Lagmultipliers.eqlin(itereq)));
         end
         
@@ -478,16 +476,16 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
 
     function val = costLagrangian(x, mus, lambdas)
         val = getCost(problem0, x);
-        if condet.has_ineq_cost
-            for numineq = 1: condet.n_ineq_constraint_cost
+        if problem0.condet.has_ineq_cost
+            for numineq = 1: problem0.condet.n_ineq_constraint_cost
                 costhandle = problem0.ineq_constraint_cost{numineq};
                 cost_numineq = costhandle(x);
                 val = val + mus(numineq) * cost_numineq;
             end
         end
 
-        if condet.has_eq_cost
-            for numeq = 1: condet.n_eq_constraint_cost
+        if problem0.condet.has_eq_cost
+            for numeq = 1: problem0.condet.n_eq_constraint_cost
                 costhandle = problem0.eq_constraint_cost{numeq};
                 cost_numeq = costhandle(x);
                 val = val + lambdas(numeq) * cost_numeq;
@@ -497,8 +495,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
 
     function gradLag = gradLagrangian(x, mus, lambdas)
         gradLag = getGradient(problem0, x);
-        if condet.has_ineq_cost
-            for numineq = 1: condet.n_ineq_constraint_cost
+        if problem0.condet.has_ineq_cost
+            for numineq = 1: problem0.condet.n_ineq_constraint_cost
                 gradhandle = problem0.ineq_constraint_grad{numineq};
                 constraint_grad = gradhandle(x);
                 constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
@@ -506,8 +504,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             end
         end
 
-        if condet.has_eq_cost
-            for numeq = 1:condet.n_eq_constraint_cost
+        if problem0.condet.has_eq_cost
+            for numeq = 1:problem0.condet.n_eq_constraint_cost
                 gradhandle = problem0.eq_constraint_grad{numeq};
                 constraint_grad = gradhandle(x);
                 constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
@@ -518,8 +516,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
 
     function hessLag = hessLagrangian(x, dir, mus, lambdas)
         hessLag = getHessian(problem0, x, dir);
-        if condet.has_ineq_cost
-            for numineq = 1 : condet.n_ineq_constraint_cost
+        if problem0.condet.has_ineq_cost
+            for numineq = 1 : problem0.condet.n_ineq_constraint_cost
                 gradhandle = problem0.ineq_constraint_grad{numineq};
                 constraint_egrad = gradhandle(x); % to be refactored
                 hesshandle = problem0.ineq_constraint_hess{numineq};
@@ -530,8 +528,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
                     mus(numineq), constraint_hess);
             end
         end
-        if condet.has_eq_cost
-            for numeq = 1 : condet.n_eq_constraint_cost
+        if problem0.condet.has_eq_cost
+            for numeq = 1 : problem0.condet.n_eq_constraint_cost
                 gradhandle = problem0.eq_constraint_grad{numeq};
                 constraint_egrad = gradhandle(x);
                 hesshandle = problem0.eq_constraint_hess{numeq};
@@ -546,16 +544,16 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
 
     function val = loneMeritFunction(x, rho)
         val = getCost(problem0, x);
-        if condet.has_ineq_cost
-            for numineq = 1: condet.n_ineq_constraint_cost
+        if problem0.condet.has_ineq_cost
+            for numineq = 1: problem0.condet.n_ineq_constraint_cost
                 costhandle = problem0.ineq_constraint_cost{numineq};
                 cost_numineq = costhandle(x);
                 val = val + rho * max(0, cost_numineq);
             end
         end
 
-        if condet.has_eq_cost
-            for numeq = 1: condet.n_eq_constraint_cost
+        if problem0.condet.has_eq_cost
+            for numeq = 1: problem0.condet.n_eq_constraint_cost
                 costhandle = problem0.eq_constraint_cost{numeq};
                 cost_numeq = costhandle(x);
                 val = val + rho * abs(cost_numeq);
@@ -567,18 +565,86 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         maxviolation = 0;
         meanviolation = 0;
 
-        for numineq = 1: condet.n_ineq_constraint_cost
+        for numineq = 1: problem0.condet.n_ineq_constraint_cost
             costhandle = problem0.ineq_constraint_cost{numineq};
             cost_at_x = costhandle(xCur);
             maxviolation = max(maxviolation, cost_at_x);
             meanviolation = meanviolation + max(0, cost_at_x);
         end
         
-        for numeq = 1: condet.n_eq_constraint_cost
+        for numeq = 1: problem0.condet.n_eq_constraint_cost
             costhandle = problem0.eq_constraint_cost{numeq};
             cost_at_x = abs(costhandle(xCur));
             maxviolation = max(maxviolation, cost_at_x);
             meanviolation = meanviolation + cost_at_x;
         end
+        meanviolation = meanviolation / (problem0.condet.n_ineq_constraint_cost + problem0.condet.n_eq_constraint_cost);
+    end
+
+    function condet = sqp_constraintsdetail(problem)
+        condet.has_ineq_cost = isfield(problem, 'ineq_constraint_cost');
+        condet.has_ineq_grad = isfield(problem, 'ineq_constraint_grad');
+        condet.has_ineq_hess = isfield(problem, 'ineq_constraint_hess');
+        condet.has_eq_cost = isfield(problem, 'eq_constraint_cost');
+        condet.has_eq_grad = isfield(problem, 'eq_constraint_grad');
+        condet.has_eq_hess = isfield(problem, 'eq_constraint_hess');
+
+        if condet.has_ineq_cost
+            condet.n_ineq_constraint_cost  = length(problem.ineq_constraint_cost);
+        else
+            condet.n_ineq_constraint_cost = 0;
+        end
+        if condet.has_ineq_grad
+            condet.n_ineq_constraint_grad  = length(problem.ineq_constraint_grad);
+        else
+            condet.n_ineq_constraint_grad  = 0;
+        end
+        if condet.has_ineq_hess
+            condet.n_ineq_constraint_hess  = length(problem.ineq_constraint_hess);
+        else
+            condet.n_ineq_constraint_hess  = 0;
+        end
+
+        if condet.has_eq_cost
+            condet.n_eq_constraint_cost  = length(problem.eq_constraint_cost);
+        else
+            condet.n_eq_constraint_cost = 0;
+        end
+        if condet.has_eq_grad
+            condet.n_eq_constraint_grad  = length(problem.eq_constraint_grad);
+        else 
+            condet.n_eq_constraint_grad = 0;
+        end
+        if condet.has_eq_hess
+            condet.n_eq_constraint_hess  = length(problem.eq_constraint_hess);
+        else 
+            condet.n_eq_constraint_hess = 0;
+        end
+
+        if (condet.n_ineq_constraint_cost ~= condet.n_ineq_constraint_grad)
+            warning('checkconstraints:number',['the number of cost functions of'...
+                'inequality constraints do not match the number of gradient functions']);
+        end
+        if (condet.n_ineq_constraint_grad ~= condet.n_ineq_constraint_hess)
+            warning('checkconstraints:number',['the number of grad functions of'...
+                'inequality constraints do not match the number of hessian functions']);
+        end
+        if (condet.n_ineq_constraint_cost ~= condet.n_ineq_constraint_hess)
+            warning('checkconstraints:number',['the number of cost functions of'...
+                'inequality constraints do not match the number of hessian functions']);
+        end    
+
+        if (condet.n_eq_constraint_cost ~= condet.n_eq_constraint_grad)
+            warning('checkconstraints:number',['the number of cost functions of'...
+                'equality constraints do not match the number of gradient functions']);
+        end
+        if (condet.n_eq_constraint_grad ~= condet.n_eq_constraint_hess)
+            warning('checkconstraints:number',['the number of grad functions of'...
+                'equality constraints do not match the number of hessian functions']);
+        end    
+        if (condet.n_eq_constraint_cost ~= condet.n_eq_constraint_hess)
+            warning('checkconstraints:number',['the number of cost functions of'...
+                'equality constraints do not match the number of hessian functions']);
+        end 
     end
 end

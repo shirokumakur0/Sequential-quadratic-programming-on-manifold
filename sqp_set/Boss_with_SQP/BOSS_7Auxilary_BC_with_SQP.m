@@ -2,16 +2,17 @@
 %--------------------------Balanced Cut------------------------------------
 close all; clear all; clc;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
-
 %dim_set = [10, 25, 30, 50, 60]; %dimension of the Adjacency Matrix
-dim_set = [5, 75, 90, 100, 120];
-density_set = [0.005, 0.01, 0.02, 0.04, 0.08]; %density of the Adjacency Matrix 
-
+dim_set = [25, 30]; %dimension of the Adjacency Matrix
+%dim_set = [5, 75, 90, 100, 120];
+%density_set = [0.005, 0.01, 0.02, 0.04, 0.08]; %density of the Adjacency Matrix 
+density_set = [0.01,0.02, 0.04];
 
 n_repeat = 1;   %Number of repeat on same set of data
 rank = 2;     %Graph Bisection
 seed_size = 5; %fixed seed size for BA
 prob_ER = 0.5; %probability of connecting an edge in ER graph.
+sqp_repeat  = 10;
 
 for repeat = 1 : n_repeat
     
@@ -31,6 +32,9 @@ for repeat = 1 : n_repeat
             options.trimhess_perturbation = 5e-9;
 
             %________Setting________
+            % for repeat SQP
+            setting.sqp_repeat = sqp_repeat;
+           
             setting.repeat = repeat;
             setting.dim = dim;
             setting.density = density;
@@ -50,13 +54,13 @@ for repeat = 1 : n_repeat
                 specifier.ind = [0, 1, 1, 1, 1, 1, 1];
             end
             
-            result = clientconstraint_oblique_balancedcut_with_SQP(L, rank, options, specifier, setting);
+            result = clientconstraint_oblique_balancedcut_auxiliary_with_SQP(L, rank, options, specifier, setting);
             result = result(:);
             param = [dim; density; repeat];
             outputdata = [result; param]';
             
-            filename = sprintf('with_SQP_zz_BC_Dim%d.dat', dim);
-            dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
+            %filename = sprintf('with_SQP_zz_BC_Auxiliary_Dim%d.dat', dim);
+            %dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
         end
         
     end
