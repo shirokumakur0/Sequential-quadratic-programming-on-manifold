@@ -29,7 +29,7 @@ for repeat = 1 : n_repeat
             options.maxtime = 3600;
             options.minstepsize = 3e-4;
             options.verbosity = 1;
-            options.trimhess_perturbation = 5e-9;
+            options.maxeigval_threshold = 1e-12;
 
             %________Setting________
             % for repeat SQP
@@ -43,7 +43,7 @@ for repeat = 1 : n_repeat
             setting.maxtime = options.maxtime;
             setting.minstepsize = options.minstepsize;
             setting.verbosity = options.verbosity;
-            setting.trimhess_perturbation = options.trimhess_perturbation;
+            setting.maxeigval_threshold = options.maxeigval_threshold;
             setting.L = L;
             
             
@@ -61,8 +61,6 @@ for repeat = 1 : n_repeat
             
             %filename = sprintf('with_SQP_zz_BC_Auxiliary_Dim%d.dat', dim);
             %dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
-        end
-        
+        end 
     end
-    
 end

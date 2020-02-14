@@ -25,19 +25,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
 % 
 % The output 'info' is a struct-array which contains information about the
 % iterations:
-%   iter (integer)
-%       The iteration number, or number of steps considered
-%       (whether accepted or rejected). The initial guess is 0.
-%	cost (double)
-%       The corresponding cost value.
-%	gradnorm (double)
-%       The (Riemannian) norm of the gradient.
-%	time (double)
-%       The total elapsed time in seconds to reach the corresponding cost.
-%	stepsize (double)
-%       The size of the step from the previous to the new iterate.
-%   accepted(bool)
-%       The feasibility of the current point.
+%            LATER!
+%
 % For example, type [info.gradnorm] to obtain a vector of the successive
 % gradient norms reached at each iteration.
 %
@@ -46,58 +35,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
 % value, pass an options structure with a field options.optionname, where
 % optionname is one of the following and the default value is indicated
 % between parentheses:
-%
-%   tolgradnorm (1e-7)
-%       The algorithm terminates if the norm of the gradient of the
-%       Lagrangian (Notice here!)
-%       drops below this. For well-scaled problems, a rule of thumb is that you can
-%       expect to reduce the gradient norm by 7 orders of magnitude
-%       (sqrt(eps)) compared to the gradient norm at a "typical" point (a
-%       rough initial iterate for example). Further decrease is sometimes
-%       possible, but inexact floating point arithmetic will eventually
-%       limit the final accuracy. If tolgradnorm is set too low, the
-%       algorithm may end up iterating forever (or at least until another
-%       stopping criterion triggers).
-%   maxiter (1000)
-%       The algorithm terminates if maxiter iterations were executed.
-%   maxtime (3600)
-%       The algorithm terminates if maxtime seconds elapsed.
-%   minstepsize (1e-6)
-%       The minimum norm of the tangent vector that points from the current
-%       point to the next point. If the norm is less than minstepsize, the 
-%       program will terminate.
-%   statsfun (none)
-%       Function handle to a function that will be called after each
-%       iteration to provide the opportunity to log additional statistics.
-%       They will be returned in the info struct. See the generic Manopt
-%       documentation about solvers for further information. statsfun is
-%       called with the point x that was reached last, after the
-%       accept/reject decision. See comment below.
-%   stopfun (none)
-%       Function handle to a function that will be called at each iteration
-%       to provide the opportunity to specify additional stopping criteria.
-%       See the generic Manopt documentation about solvers for further
-%       information.
-%   verbosity (2)
-%       Integer number used to tune the amount of output the algorithm
-%       generates during execution (mostly as text in the command window).
-%       The higher, the more output. 0 means silent. 3 and above includes a
-%       display of the options structure at the beginning of the execution.
-%   debug (false)
-%       Set to true to allow the algorithm to perform additional
-%       computations for debugging purposes. If a debugging test fails, you
-%       will be informed of it, usually via the command window. Be aware
-%       that these additional computations appear in the algorithm timings
-%       too, and may interfere with operations such as counting the number
-%       of cost , etc. (the debug calls get storedb too).
-%   storedepth (10)
-%       Maximum number of different points x of the manifold for which a
-%       store structure will be kept in memory in the storedb. If the
-%       caching features of Manopt are not used, this is irrelevant. If
-%       memory usage is an issue, you may try to lower this number.
-%       Profiling may then help to investigate if a performance hit was
-%       incurred as a result.
-%
+%                     LATER!
 %
 % Please cite the Manopt paper as well as the research paper:
 % @InBook{Obara2020,
@@ -135,27 +73,24 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     %         'To disable this warning: warning(''off'', ''manopt:getGradient:approx'')']);
     %     problem0.approxgrad = approxgradientFD(problem0);
     % end
-    
-    % If the struct 'problem0' does not have a condet field (which is an
-    % expected situation), add it to the problem0 here.
-    %if ~isfield(problem0, 'condet')
-    %    problem0.condet = constraintsdetail(problem0);
-    %end
-    
+        
     condet = constraintsdetail(problem0);
     
     % Set localdefaults, a struct to be combined with argument options for
     % declaring hyperparameters.
+    
+    % For stopping criteria
     localdefaults.maxiter = 5000;
     localdefaults.maxtime = 3600;
     localdefaults.tolqpnorm = 1e-5;
     localdefaults.tolgradnorm = 1e-5;
     localdefaults.toliterdist = 1e-5;
-    % Hyperparameters for StoreDB
+    % For StoreDB
     localdefaults.storedepth = 3;
-    % The way to treat the hessian matrix to be positive semidefinete.
-    localdefaults.trimhessian = 'mineigval_manopt';
-    localdefaults.trimhess_perturbation = 0;
+    % For modification for the hessian matrix to be positive semidefinete.
+    localdefaults.modify_hessian = 'mineigval_matlab';
+    localdefaults.mineigval_correction = 1e-10; % the param for mineigval_manopt or _matlab
+    localdefaults.mineigval_threshold = 1e-3;
     % Initial parameters for the merit function and the Lagrangian
     localdefaults.tau = 0.8;  % TODO: should find an appropriate value as long as tau > 0
     localdefaults.rho = 1;  % TODO: should find an appropriate value as long as rho > 0
@@ -163,9 +98,10 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     localdefaults.gamma = 0.5; % TODO: should find an appropriate value as long as 1 > gamma > 0  
     localdefaults.mus = ones(condet.n_ineq_constraint_cost, 1);
     localdefaults.lambdas = ones(condet.n_eq_constraint_cost, 1);    
-    localdefaults.ls_max_steps  = 30;
-    localdefaults.regularhesseigval = 1e-3;
-    localdefaults.ls_perturbation = 1e-4;
+    % For linesearch
+    localdefaults.ls_max_steps  = 50;
+    localdefaults.ls_threshold = 1e-4;
+    % For display
     localdefaults.verbosity = 1;
     localdefaults.qp_verbosity = 0;
     
@@ -176,7 +112,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     end
     options = mergeOptions(localdefaults, options);
     
-    % set quadprog verbosity
+    % Set the quadprog verbosities
     if options.qp_verbosity == 0
         qpoptions = optimset('Display','off');
     else
@@ -194,13 +130,11 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     storedb = StoreDB(options.storedepth);
     key = storedb.getNewKey();
     
-    % create some initial variables which will be used in the following
+    % Create some initial variables which will be used in the following
     % loop.
-    mus = options.mus; % initinal mus and lambdas for the Lagrangian
+    mus = options.mus; % Init. mus and lambdas for the Lagrangian
     lambdas = options.lambdas;
-    rho = options.rho; % initinal rho for merit function
-    % stepsize = 1; % initial stepsize for linesearch
-    % lsstats = []; % Line-search stastics for recording in info.
+    rho = options.rho; % Init. rho for merit function
     
     % For the initial savestats, declare some variables
     iter = 0;
@@ -214,29 +148,28 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     info(1) = stats;
     info(min(10000, options.maxiter+1)).iter = [];
     
-    % stop flag, finally it should be true
+    % Stop flag, finally it should be true
     stop = false;
     totaltime = tic();
     
     % Main loop where we solve subproblems iteratively
     while true
-        
         if options.verbosity >= 2
             fprintf('Iter: %d, Cost: %f, LagGradNorm: %f \n', iter, xCurCost, xCurLagGradNorm);
-        elseif options.verbosity == 1
+        elseif options.verbosity >= 1
             if mod(iter, 100) == 0 && iter ~= 0
                 fprintf('Iter: %d, Cost: %f, LagGradNorm: %f \n', iter, xCurCost, xCurLagGradNorm);
             end
         end
-        iter = iter + 1;
         
+        iter = iter + 1;
         timetic = tic();
 
         % Get current Hessian and gradient of the cost function.
         % Also, make a "qpinfo" structure stading for the subproblem
         % at the current point.
         
-        costLag = @(X) costLagrangian(X, mus, lambdas); % which we';; use in hessextreme
+        costLag = @(X) costLagrangian(X, mus, lambdas); % which we'll use in hessextreme
         gradLag = @(X) gradLagrangian(X, mus, lambdas); % in the tangent space
         hessLag = @(X, d) hessLagrangian(X, d, mus, lambdas); % in the tangent space
 
@@ -245,16 +178,17 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         auxproblem.grad = gradLag;
         auxproblem.hess = hessLag;
 
-        % make H and basis
+        % Make H, basis, and n
         [H,basis] = hessianmatrix(auxproblem, xCur);
-        qpinfo.H = H;
+        qpinfo.H = (H.'+H)/2;
         qpinfo.basis = basis;
         qpinfo.n = numel(basis);
 
-        % make f
+        % Make f
         f = zeros(qpinfo.n, 1);
+        xCurGrad = getGradient(problem0, xCur, storedb, key);
         for fidx =1:qpinfo.n
-            f(fidx) = auxproblem.M.inner(xCur, auxproblem.grad(xCur), basis{fidx});
+            f(fidx) = problem0.M.inner(xCur, xCurGrad, basis{fidx});
         end
         qpinfo.f = f;
 
@@ -265,14 +199,14 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             A = zeros(row, col);
             b = zeros(row, 1);
             for ineqrow = 1:row
-                costhandle = problem0.ineq_constraint_cost{ineqrow};
-                b(ineqrow) = - costhandle(xCur);
-                gradhandle = problem0.ineq_constraint_grad{ineqrow};
-                constraint_egrad = gradhandle(xCur);
-                constraint_grad = problem0.M.egrad2rgrad(xCur, constraint_egrad);
+                ineqcosthandle = problem0.ineq_constraint_cost{ineqrow};
+                b(ineqrow) = - ineqcosthandle(xCur);
+                ineqgradhandle = problem0.ineq_constraint_grad{ineqrow};
+                ineqconstraint_egrad = ineqgradhandle(xCur);
+                ineqconstraint_grad = problem0.M.egrad2rgrad(xCur, ineqconstraint_egrad);
                 for ineqcol = 1:col
                     base = qpinfo.basis{ineqcol};
-                    A(ineqrow,ineqcol) = problem0.M.inner(xCur, constraint_grad, base);
+                    A(ineqrow,ineqcol) = problem0.M.inner(xCur, ineqconstraint_grad, base);
                 end
             end
         else
@@ -289,14 +223,14 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             Aeq = zeros(row, col);
             beq = zeros(row, 1);
             for eqrow = 1:row
-                costhandle = problem0.eq_constraint_cost{eqrow};
-                beq(eqrow) = - costhandle(xCur);
-                gradhandle = problem0.eq_constraint_grad{eqrow};
-                constraint_egrad = gradhandle(xCur);
-                constraint_grad = problem0.M.egrad2rgrad(xCur, constraint_egrad);
+                eqcosthandle = problem0.eq_constraint_cost{eqrow};
+                beq(eqrow) = - eqcosthandle(xCur);
+                eqgradhandle = problem0.eq_constraint_grad{eqrow};
+                eqconstraint_egrad = eqgradhandle(xCur);
+                eqconstraint_grad = problem0.M.egrad2rgrad(xCur, eqconstraint_egrad);
                 for eqcol = 1:col
                     base = qpinfo.basis{eqcol};
-                    Aeq(eqrow,eqcol) = problem0.M.inner(xCur, constraint_grad, base);
+                    Aeq(eqrow,eqcol) = problem0.M.inner(xCur, eqconstraint_grad, base);
                 end
             end
         else
@@ -306,75 +240,74 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         qpinfo.Aeq = Aeq;
         qpinfo.beq = beq;
         
-        % Trim qpinfo.H (Hessian matrix) in some way, say, regularizeing
-        % according to the minimum eigenvalue of Hessian obtained in some way
-        % or replacing it with the identity matrix
-        if strcmp(options.trimhessian, "eye")
+        % Modify qpinfo.H (Hessian matrix) to be positive definite somehow.
+        % The difference between mineiegval_manopt and mineigval_matlab is
+        % a solver for calculating the minimum eigen value.
+        if strcmp(options.modify_hessian, "eye")
+            % The identity matrix as replacement to Hessian.
             qpinfo.H = eye(qpinfo.n);
-        elseif strcmp(options.trimhessian, 'mineigval_matlab')
+        elseif strcmp(options.modify_hessian, 'mineigval_matlab') 
+            % The eigenvalue decomposition function on matlab
             eigval = eig(qpinfo.H);
             qpinfo.mineigval = min(eigval);
             if qpinfo.mineigval < 0
-                qpinfo.regularmineigval= max(options.regularhesseigval, abs(qpinfo.mineigval));
-                qpinfo.H = qpinfo.H + (qpinfo.regularmineigval + options.trimhess_perturbation )* eye(qpinfo.n);
+                qpinfo.mineigval_diagcoeff= max(options.mineigval_threshold,...
+                    abs(qpinfo.mineigval)) + options.mineigval_correction;
+                qpinfo.H = qpinfo.H + qpinfo.mineigval_diagcoeff * eye(qpinfo.n);
             end
-        elseif strcmp(options.trimhessian, 'mineigval_manopt')
-            % the difference between mineiegval_manopt and mineigval_matlab is
-            % a solver for calculating the minimum eigen value. _matlab use the
-            % eigenvalue decomposition function on matlab, whereas, _manopt use
-            % the hessianextreme function which formulzize and solve
-            % an optimization problem to get a minimum eigenvalue and 
-            % the corresponding eigenvector.
+        elseif strcmp(options.modify_hessian, 'mineigval_manopt')
+            % Rayleigh quotient minization to get get a minimum eigenvalue.
             [~ ,qpinfo.mineigval] = hessianextreme(auxproblem, xCur);
             if qpinfo.mineigval < 0
-                qpinfo.regularmineigval = max(options.regularhesseigval, abs(qpinfo.mineigval));
-                qpinfo.H = qpinfo.H + (qpinfo.regularmineigval + options.trimhess_perturbation) * eye(qpinfo.n);
+                qpinfo.mineigval_diagcoeff = max(options.mineigval_threshold,...
+                    abs(qpinfo.mineigval)) + options.mineigval_correction;
+                qpinfo.H = qpinfo.H + qpinfo.mineigval_diagcoeff * eye(qpinfo.n);
             end
         end
-        
+        qpinfo.H = (qpinfo.H.'+qpinfo.H)/2;
 
         % Compute the direction and Lagrange multipliers
         % by solving QP with quadprog, a matlab solver for QP
         [coeff, ~, qpexitflag, ~, Lagmultipliers] = quadprog(qpinfo.H, qpinfo.f,...
             qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq, [], [], [], qpoptions);
-        
         deltaXast = 0;
         for i = 1:qpinfo.n
             deltaXast = deltaXast + coeff(i)* qpinfo.basis{i};
         end
         
         % Update rho, a penalty parameter, if needed.
-        newacc = 0;
-        for iterineq = 1 : condet.n_ineq_constraint_cost
-            newacc = max(newacc, Lagmultipliers.ineqlin(iterineq));
+        newacc = rho;
+        if condet.has_ineq_cost
+            for iterineq = 1 : condet.n_ineq_constraint_cost
+                newacc = max(newacc, Lagmultipliers.ineqlin(iterineq));
+            end
         end
-        
-        for itereq = 1 : condet.n_eq_constraint_cost
-            newacc = max(newacc, abs(Lagmultipliers.eqlin(itereq)));
+        if condet.has_eq_cost
+            for itereq = 1 : condet.n_eq_constraint_cost
+                newacc = max(newacc, abs(Lagmultipliers.eqlin(itereq)));
+            end
         end
-        
         if rho < newacc
            rho = newacc;
         end
         
-        % make a struct and some variables for loneArmijoLineSearch
+        % Compute a problem and some variables for loneArmijoLineSearch
         meritproblem.M = problem0.M;
         meritproblem.cost = @(x) loneMeritFunction(x, rho);
         f0 = meritproblem.cost(xCur);
         
-        % decide the value of df0 according to the way to
-        % options.trimhessian
-        if strcmp(options.trimhessian, "eye")
+        % Compute df0 according to options.modify_hessian
+        if strcmp(options.modify_hessian, "eye")
             df0 = meritproblem.M.inner(xCur, deltaXast, deltaXast);
-        elseif strcmp(options.trimhessian, 'mineigval_matlab') || strcmp(options.trimhessian, 'mineigval_manopt')
+        elseif strcmp(options.modify_hessian, 'mineigval_matlab') || strcmp(options.modify_hessian, 'mineigval_manopt')
             if qpinfo.mineigval < 0
                 df0 = meritproblem.M.inner(xCur, hessLagrangian(xCur, deltaXast,...
-                    mus, lambdas) + qpinfo.regularmineigval * deltaXast, deltaXast);
+                    mus, lambdas) + qpinfo.mineigval_diagcoeff * deltaXast, deltaXast);
             else 
                 df0 = meritproblem.M.inner(xCur, hessLagrangian(xCur, deltaXast,...
                     mus, lambdas), deltaXast);
             end
-        else % standard setting
+        else % Standard setting
             df0 = meritproblem.M.inner(xCur, hessLagrangian(xCur, deltaXast,...
                     mus, lambdas), deltaXast);
         end
@@ -383,24 +316,27 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         stepsize = 1;
         newx = meritproblem.M.retr(xCur, deltaXast, stepsize);
         newf = meritproblem.cost(newx);
-        gammadf0 = options.gamma * df0;
-        r = 0;
-        lsmaxiterbreak = false;
-        % descriptCost(meritproblem, xCur, deltaXast); % DEBUG only
-        while newf > ( f0 - gammadf0) && abs(newf - ( f0 - gammadf0)) > options.ls_perturbation
+        gammadf0 = df0 * options.gamma;
+        r = 0; % back-tracking counter
+        ls_max_steps_flag = false;
+        
+        % DEBUG only
+        % descriptCost(meritproblem, xCur, deltaXast);
+        
+        while newf > ( f0 - gammadf0) && abs(newf - ( f0 - gammadf0)) > options.ls_threshold
             if r > options.ls_max_steps
-                lsmaxiterbreak = true;
+                ls_max_steps_flag = true;
                 break;
             end
             r = r + 1;
             stepsize = stepsize * options.beta;
-            gammadf0 = stepsize * gammadf0;
+            gammadf0 =  gammadf0 * options.beta;
             newx = meritproblem.M.retr(xCur, deltaXast, stepsize);
             newf = meritproblem.cost(newx);
         end
         
         % For savestats
-        qpsolnorm = stepsize * problem0.M.norm(xCur, deltaXast);
+        % qpsolnorm = stepsize * problem0.M.norm(xCur, deltaXast);
         iterdist = problem0.M.dist(xCur, newx);
         
         % Update variables to new iterate
@@ -408,7 +344,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         mus = Lagmultipliers.ineqlin;
         lambdas =  Lagmultipliers.eqlin;
         
-        % For savestats
+        % For savestats (Cont'd)
         xCurCost = getCost(problem0, xCur, storedb, key);
         xCurLagGrad = gradLagrangian(xCur, mus, lambdas);
         xCurLagGradNorm = problem0.M.norm(xCur, xCurLagGrad);        
@@ -454,20 +390,20 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     function stats = savestats()
         stats.iter = iter;
         stats.cost = xCurCost;
-        %stats.gradnorm = xCurLagGradNorm;
+        stats.gradnorm = xCurLagGradNorm;
         if iter == 0
             stats.time = toc(timetic);
-            stats.qpsolnorm = NaN;
+            % stats.qpsolnorm = NaN;
             stats.stepsize = NaN;
-            stats.lsmaxiterbreak = NaN;
+            stats.ls_max_steps_break = NaN;
             stats.dist =  NaN;
             stats.qpexitflag = NaN;
         else
             stats.time = toc(timetic);
             stats.time = info(iter).time + toc(timetic);
-            stats.qpsolnorm = qpsolnorm;
+            % stats.qpsolnorm = qpsolnorm;
             stats.stepsize = stepsize;
-            stats.lsmaxiterbreak = lsmaxiterbreak;
+            stats.ls_max_steps_break = ls_max_steps_flag;
             stats.dist = iterdist;
             stats.qpexitflag = qpexitflag;
         end
@@ -521,7 +457,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         if condet.has_ineq_cost
             for numineq = 1 : condet.n_ineq_constraint_cost
                 gradhandle = problem0.ineq_constraint_grad{numineq};
-                constraint_egrad = gradhandle(x); % to be refactored
+                constraint_egrad = gradhandle(x);
                 hesshandle = problem0.ineq_constraint_hess{numineq};
                 constraint_ehess = hesshandle(x, dir);
                 constraint_hess = problem0.M.ehess2rhess(x, constraint_egrad,...
@@ -580,5 +516,6 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             maxviolation = max(maxviolation, cost_at_x);
             meanviolation = meanviolation + cost_at_x;
         end
+        meanviolation = meanviolation / (condet.n_ineq_constraint_cost + condet.n_eq_constraint_cost);
     end
 end
