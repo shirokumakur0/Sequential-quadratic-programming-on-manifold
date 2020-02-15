@@ -3,39 +3,51 @@
 close all; clear all; clc;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
-data_table = {'iris.csv',  4, 3;
-              'wine.csv', 13, 2;
-              'sonar.csv', 60, 2;
-              'ecoli.csv', 5, 2;
-              'pima.csv',  8, 2;
-              'vehicle.csv', 18, 4;
-              'cloud.csv', 10, 4};
+% data_table = {'iris.csv',  4, 3;
+%               'wine.csv', 13, 2;
+%               'sonar.csv', 60, 2;
+%               'ecoli.csv', 5, 2;
+%               'pima.csv',  8, 2;
+%               'vehicle.csv', 18, 4;
+%               'cloud.csv', 10, 4};
+data_table = { 5, 2, 5; % data number, data dimesion, clusters
+              10, 5, 4; 
+              10, 5, 5;
+              20, 5, 4;
+              20, 5, 5;
+              30, 5, 4;
+              30, 5, 5;
+              40, 5, 4;};
 
-
-n_repeat = 4;   % Number of repeat experiment
+n_repeat = 1;   % Number of repeat experiment
 
 for repeat = 1: n_repeat
     
     for dataset = 1 : length(data_table)
-        filename = data_table{dataset, 1};
+        data_num = data_table{dataset, 1};
+        data_dim = data_table{dataset, 2};
         rank = data_table{dataset, 3};
         
         %_______Set up data______
-        data = csvread(filename);
+        data = 5 * rand(data_num,data_dim);
         D = data*data.';
-
+        D = 0.5 * (D + D.');
+        
         %________Experiment_____
         options.maxOuterIter = 5000;
         options.maxtime = 3600;
         options.minstepsize = 1e-5;
         options.verbosity = 1;
+        
         %________Setting________
-        setting.filename = filename;
+        setting.data_num = data_num;
+        setting.data_dim = data_dim;
         setting.rank = rank;
         setting.maxOuterIter = options.maxOuterIter;
         setting.maxtime = options.maxtime;
         setting.minstepsize = options.minstepsize;
         setting.verbosity = options.verbosity;
+        setting.data = data;
         
         % Only do mini-sum-max for low dimensional data
         if dataset <= 1

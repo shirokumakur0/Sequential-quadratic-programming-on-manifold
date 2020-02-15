@@ -13,7 +13,7 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
     localdefaults.maxInnerIter = 200;
     localdefaults.startingtolgradnorm = 1e-3;
     localdefaults.endingtolgradnorm = 1e-6;
-
+    
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
     if ~exist('options', 'var') || isempty(options)
         options = struct();
@@ -93,6 +93,7 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
         stats.maxviolation = maxviolation;
         stats.meanviolation = meanviolation;
         stats.cost = costCur;
+        stats.violation_sum = violation_sum(); % (MO)
     end
     
 
@@ -147,5 +148,26 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
             end 
         end
     end
-
+    % For additiobal stats (MO)
+    function val = violation_sum()
+        xGrad = getGradient(problem0, xCur);
+        val = problem0.M.norm(xCur, xGrad)^2;
+        if condet.has_ineq_cost
+            for numineq = 1: condet.n_ineq_constraint_cost
+                costhandle = problem0.ineq_constraint_cost{numineq};
+                cost_at_x = costhandle(xCur);
+                violation = max(0, cost_at_x);
+                val = val + violation^2;
+            end
+        end
+        if condet.has_eq_cost
+            for numeq = 1: condet.n_eq_constraint_cost
+                costhandle = problem0.eq_constraint_cost{numeq};
+                cost_at_x = abs(costhandle(xCur));
+                val = val + cost_at_x^2;
+            end
+        end
+        val = sqrt(val);
+        %stats.violation_sum = val;
+    end
 end

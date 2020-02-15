@@ -52,6 +52,7 @@ condet = constraintsdetail(problem);
 
 %     ------------------------- Solving ---------------------------
     options = methodoptions;
+    options.statsfun = @violationSum;
         
     if specifier.ind(1)
         %MINI-SUM-MAX
@@ -262,6 +263,5 @@ condet = constraintsdetail(problem);
         y = x(:);
         manvio = abs(y.'*y - 1);
     end
-
 end
 

@@ -1,24 +1,29 @@
- function data = clientconstraint_stiefel_Kmeans(D, rankY, methodoptions, specifier, setting)
+ function data = clientconstraint_stiefel_Kmeans_with_SQP(D, rankY, methodoptions, specifier, setting)
 % D has to be symmetric. 
 % rankY is positive integer
 % returned table:
-%                             Col 1: Mini-sum-max, Col 2, ALM, Col 3, lqh, Col 4, lse, Col 5, fmincon
+%                Col 1: Mini-sum-max, Col 2, ALM, Col 3, lqh, Col 4, lse, Col 5, fmincon
 % Row1: Maxviolation
 % Row2: Cost
 % Row3: Time
 
-    data = NaN(3, 5);
+    data = NaN(3, 7);
 
     [N, ~] = size(D);
+    
 
     M = stiefelfactory(N, rankY);
     problem.M = M;
     problem.cost = @(Y) costFun(Y,D);
     problem.egrad = @(Y) gradFun(Y,D);
+    problem.ehess = @(Y,U) hessFun(Y,U,D);
     x0 = M.rand();
 
 %     DEBUG only
-%     checkgradient(problem);
+%     figure;
+%     checkgradient(problem); % Okay!
+%     figure;
+%     checkhessian(problem); % Okay!
 
 %-------------------------Set-up Constraints-----------------------
 % Nonnegativity of all entries
@@ -38,9 +43,20 @@
         end
     end
     
+
+    ineq_constraints_hess = cell(1, N * rankY);
+    for row = 1: N
+        for col = 1: rankY
+            constrainthess = zeros(N, rankY);
+            constrainthess(row, col) = 0;
+            ineq_constraints_hess{(col-1)*N + row} = @(Y, U) constrainthess;
+        end
+    end
+    
     problem.ineq_constraint_cost = ineq_constraints_cost;
     problem.ineq_constraint_grad = ineq_constraints_grad;
-    
+    problem.ineq_constraint_hess = ineq_constraints_hess;
+
 % 1 is the eigenvector of Y*Y.'
     colones = ones(N,1);
     eq_constraints_cost = cell(1, N);
@@ -53,13 +69,20 @@
         eq_constraints_grad{row} = @(Y) constrainteqgradFun(Y, row);
     end
     
+    eq_constraints_hess = cell(1, N);
+    for row = 1: N
+        eq_constraints_hess{row} = @(Y, U) constrainteqhessFun(Y,U, row);
+    end
+    
+    
     problem.eq_constraint_cost = eq_constraints_cost;
     problem.eq_constraint_grad = eq_constraints_grad;
+    problem.eq_constraint_hess = eq_constraints_hess;
 
     condet = constraintsdetail(problem);
     
 %     Debug Only
-%     checkconstraints(problem)
+%     checkconstraints_upto2ndorder(problem) % OKAY!
     
 %     ------------------------- Solving ---------------------------
     options = methodoptions;
@@ -206,10 +229,18 @@
         val = D*Y;
     end
 
+    function val = hessFun(Y,U,D)
+        val = D*U;
+    end
+
     function val = constrainteqgradFun(Y, i)
         val = repmat(Y(i,:), N, 1);
         val(i, :) = val(i,:) + colones'*Y;
-        
+    end
+
+    function val = constrainteqhessFun(Y,U, i)
+        val = repmat(U(i,:), N, 1);
+        val(i, :) = val(i,:) + colones'*U;
     end
     
     function displayinfo(stats)
@@ -234,6 +265,4 @@
         %Stefel Factory:
         manvio = max(max(abs(x.'*x-eye(rankY))));
     end
-
-
 end

@@ -4,7 +4,7 @@ close all; clear all; clc;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
 %dim_set = [10, 25, 30, 50, 60]; %dimension of the Adjacency Matrix
-dim_set = [5, 75, 90, 100, 120];
+dim_set = [5, 50, 75, 90, 100, 125, 150, 200];
 density_set = [0.005, 0.01, 0.02, 0.04, 0.08]; %density of the Adjacency Matrix 
 
 
@@ -26,9 +26,8 @@ for repeat = 1 : n_repeat
             %________Experiment_____
             options.maxOuterIter = 5000;
             options.maxtime = 3600;
-            options.minstepsize = 3e-4;
+            options.minstepsize = 1e-4;
             options.verbosity = 1;
-            options.trimhess_perturbation = 5e-9;
 
             %________Setting________
             setting.repeat = repeat;
@@ -39,7 +38,7 @@ for repeat = 1 : n_repeat
             setting.maxtime = options.maxtime;
             setting.minstepsize = options.minstepsize;
             setting.verbosity = options.verbosity;
-            setting.trimhess_perturbation = options.trimhess_perturbation;
+            %setting.trimhess_perturbation = options.trimhess_perturbation;
             setting.L = L;
             
             

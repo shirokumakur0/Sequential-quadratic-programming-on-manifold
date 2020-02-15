@@ -271,7 +271,6 @@ function [x, cost, info, options] = bfgsnonsmoothminimax(problem, x0, options)
         stats.linesearch = lsstats;
         stats = applyStatsfun(problem, xCur, storedb, key, options, stats);
     end
-
 end
 
 % BFGS step, see Wen's paper for details. This functon basically takes in

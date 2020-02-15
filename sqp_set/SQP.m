@@ -89,13 +89,13 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     localdefaults.storedepth = 3;
     % For modification for the hessian matrix to be positive semidefinete.
     localdefaults.modify_hessian = 'mineigval_matlab';
-    localdefaults.mineigval_correction = 1e-10; % the param for mineigval_manopt or _matlab
+    localdefaults.mineigval_correction = 1e-8; % the param for mineigval_manopt or _matlab
     localdefaults.mineigval_threshold = 1e-3;
     % Initial parameters for the merit function and the Lagrangian
     localdefaults.tau = 0.8;  % TODO: should find an appropriate value as long as tau > 0
     localdefaults.rho = 1;  % TODO: should find an appropriate value as long as rho > 0
     localdefaults.beta = 0.5;  % TODO: should find an appropriate value as long as 1 > beta > 0
-    localdefaults.gamma = 0.5; % TODO: should find an appropriate value as long as 1 > gamma > 0  
+    localdefaults.gamma = 0.4; % TODO: should find an appropriate value as long as 1 > gamma > 0  
     localdefaults.mus = ones(condet.n_ineq_constraint_cost, 1);
     localdefaults.lambdas = ones(condet.n_eq_constraint_cost, 1);    
     % For linesearch
@@ -337,8 +337,11 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         
         % For savestats
         % qpsolnorm = stepsize * problem0.M.norm(xCur, deltaXast);
-        iterdist = problem0.M.dist(xCur, newx);
-        
+        if contains(problem0.M.name(),'Stiefel')
+            dist = norm(xCur - newx, 'fro');
+        else
+            dist = problem0.M.dist(xCur, newx);
+        end
         % Update variables to new iterate
         xCur = newx;
         mus = Lagmultipliers.ineqlin;
@@ -371,7 +374,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         %    fprintf('QP solution norm with stepsize tolerance reached\n');
         %    options.reason = "Legrangian Gradient norm tolerance reached";
         %    stop = true;
-        elseif iterdist <= options.toliterdist
+        elseif dist <= options.toliterdist
             fprintf('Distance of iteration tolerance reached\n');
             options.reason = 'Distance of iteration tolerance reached';
             stop = true;
@@ -404,10 +407,11 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             % stats.qpsolnorm = qpsolnorm;
             stats.stepsize = stepsize;
             stats.ls_max_steps_break = ls_max_steps_flag;
-            stats.dist = iterdist;
+            stats.dist = dist;
             stats.qpexitflag = qpexitflag;
         end
-        % stats.rho = rho;
+        stats.rho = rho;
+        stats.violation_sum = violation_sum();
         [stats.maxviolation, stats.meanviolation] = const_evaluation(xCur);
         stats = applyStatsfun(problem0, xCur, storedb, key, options, stats);
     end
@@ -502,20 +506,47 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     function [maxviolation, meanviolation] = const_evaluation(xCur)
         maxviolation = 0;
         meanviolation = 0;
-
-        for numineq = 1: condet.n_ineq_constraint_cost
-            costhandle = problem0.ineq_constraint_cost{numineq};
-            cost_at_x = costhandle(xCur);
-            maxviolation = max(maxviolation, cost_at_x);
-            meanviolation = meanviolation + max(0, cost_at_x);
-        end
         
-        for numeq = 1: condet.n_eq_constraint_cost
-            costhandle = problem0.eq_constraint_cost{numeq};
-            cost_at_x = abs(costhandle(xCur));
-            maxviolation = max(maxviolation, cost_at_x);
-            meanviolation = meanviolation + cost_at_x;
+        if condet.has_ineq_cost
+            for numineq = 1: condet.n_ineq_constraint_cost
+                costhandle = problem0.ineq_constraint_cost{numineq};
+                cost_at_x = costhandle(xCur);
+                maxviolation = max(maxviolation, cost_at_x);
+                meanviolation = meanviolation + max(0, cost_at_x);
+            end
         end
-        meanviolation = meanviolation / (condet.n_ineq_constraint_cost + condet.n_eq_constraint_cost);
+        if condet.has_eq_cost
+            for numeq = 1: condet.n_eq_constraint_cost
+                costhandle = problem0.eq_constraint_cost{numeq};
+                cost_at_x = abs(costhandle(xCur));
+                maxviolation = max(maxviolation, cost_at_x);
+                meanviolation = meanviolation + cost_at_x;
+            end
+        end
+        if condet.has_ineq_cost || condet.has_eq_cost
+            meanviolation = meanviolation / (condet.n_ineq_constraint_cost + condet.n_eq_constraint_cost);
+        end
+    end
+    % For additiobal stats
+    function val = violation_sum()
+        xGrad = getGradient(problem0, xCur, storedb, key);
+        val = problem0.M.norm(xCur, xGrad)^2;
+        if condet.has_ineq_cost
+            for numineq = 1: condet.n_ineq_constraint_cost
+                costhandle = problem0.ineq_constraint_cost{numineq};
+                cost_at_x = costhandle(xCur);
+                violation = max(0, cost_at_x);
+                val = val + violation^2;
+            end
+        end
+        if condet.has_eq_cost
+            for numeq = 1: condet.n_eq_constraint_cost
+                costhandle = problem0.eq_constraint_cost{numeq};
+                cost_at_x = abs(costhandle(xCur));
+                val = val + cost_at_x^2;
+            end
+        end
+        val = sqrt(val);
+        %stats.violation_sum = val;
     end
 end
