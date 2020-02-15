@@ -4,7 +4,7 @@
 close all; clc; clear all;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
-dim_set = [10, 25, 50, 75, 100, 125, 150];  % Dimension of "the Cov Matrix"
+dim_set = [10, 50, 100, 150, 300, 500, 750, 1000];  % Dimension of "the Cov Matrix"
 snrset = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0]; % Signal Strength
 deltaset = [0.1, 0.3, 0.7, 0.9];           % Sparsity 
 rank = 1;                                  % Rank of BM Relaxation. 1 if we don't.
@@ -36,6 +36,7 @@ for repeat = 1: n_repeat
                 options.maxOuterIter = 5000;
                 options.maxtime = 3600;
                 options.minstepsize = 1e-4;
+                options.mineigval_correction = 0;
                 options.verbosity = 1;
                 
                 %________Setting________

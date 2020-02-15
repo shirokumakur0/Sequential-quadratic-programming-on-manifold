@@ -10,20 +10,20 @@ specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 %               'pima.csv',  8, 2;
 %               'vehicle.csv', 18, 4;
 %               'cloud.csv', 10, 4};
-data_table = { 5, 2, 5; % data number, data dimesion, clusters
-              10, 5, 4; 
-              10, 5, 5;
+data_table = { % data number, data dimesion, clusters
+              10, 5, 4
+ 
               20, 5, 4;
               20, 5, 5;
               30, 5, 4;
               30, 5, 5;
               40, 5, 4;};
-
+[row_data_table,~] = size(data_table);
 n_repeat = 1;   % Number of repeat experiment
 
 for repeat = 1: n_repeat
     
-    for dataset = 1 : length(data_table)
+    for dataset = 1 : row_data_table
         data_num = data_table{dataset, 1};
         data_dim = data_table{dataset, 2};
         rank = data_table{dataset, 3};
@@ -37,12 +37,14 @@ for repeat = 1: n_repeat
         options.maxOuterIter = 5000;
         options.maxtime = 3600;
         options.minstepsize = 1e-5;
+        options.mineigval_correction = 1e-3;
         options.verbosity = 1;
         
         %________Setting________
         setting.data_num = data_num;
         setting.data_dim = data_dim;
         setting.rank = rank;
+        setting.repeat = repeat;
         setting.maxOuterIter = options.maxOuterIter;
         setting.maxtime = options.maxtime;
         setting.minstepsize = options.minstepsize;
@@ -55,6 +57,8 @@ for repeat = 1: n_repeat
         else
             specifier.ind = [0, 1, 1, 1, 1, 1, 1];
         end
+        
+        %specifier.ind = [0,0,0,0,0,0,1];
         
         result = clientconstraint_stiefel_Kmeans_with_SQP(D, rank, options, specifier, setting);
         result = result(:);

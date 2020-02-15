@@ -94,12 +94,16 @@
         [xfinal, info] = exactpenaltyViaMinimax(problem, x0, options);
         time = toc(timetic);
 
+        filename = sprintf('KNN_Mini-Sum-Max_nrep%dNum%dDim%dRank%d.csv',setting.repeat,...
+            setting.data_num, setting.data_dim, setting.rank);
+        struct2csv(info, filename);
+        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
         data(1, 1) = maxviolation;
         data(2, 1) = cost;
         data(3, 1) = time;
-    end
+    end    
     
     if specifier.ind(2)
         %ALM
@@ -108,19 +112,30 @@
         [xfinal, info] = almbddmultiplier(problem, x0, options);
         time = toc(timetic);
         
+        info = rmfield(info, 'lambdas');
+        info = rmfield(info, 'gammas');
+        
+        filename = sprintf('KNN_ALM_nrep%dNum%dDim%dRank%d.csv',setting.repeat,...
+            setting.data_num, setting.data_dim, setting.rank);
+        struct2csv(info, filename);
+        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
         data(1, 2) = maxviolation;
         data(2, 2) = cost;
         data(3, 2) = time;
     end
-
+    
     if specifier.ind(3)
         %LQH
         fprintf('Starting LQH \n');
         timetic = tic();
         [xfinal, info] = exactpenaltyViaSmoothinglqh(problem, x0, options);
         time = toc(timetic);
+        
+        filename = sprintf('KNN_LQH_nrep%dNum%dDim%dRank%d.csv',setting.repeat,...
+            setting.data_num, setting.data_dim, setting.rank);
+        struct2csv(info, filename);
 
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
@@ -136,6 +151,10 @@
         timetic = tic();
         [xfinal, info] = exactpenaltyViaSmoothinglse(problem, x0, options);
         time = toc(timetic);
+
+        filename = sprintf('KNN_LQH_nrep%dNum%dDim%dRank%d.csv',setting.repeat,...
+            setting.data_num, setting.data_dim, setting.rank);
+        struct2csv(info, filename);
         
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
@@ -145,23 +164,35 @@
     end
     
     if specifier.ind(5)
-        %FMINCON
-        fprintf('Starting fmincon \n');
-        maxiter = 100000000;
+        %FMINCON interior-point
+        fprintf('Starting fmincon_interior_point \n');
+        maxiter = methodoptions.maxOuterIter;
         if specifier.matlabversion == 0
             % Use this if you are at 2015a or older.
-            options = optimoptions('fmincon', 'MaxIter', maxiter, 'MaxFunEvals', maxiter,...
+            options = optimoptions('fmincon', 'Algorithm', 'interior-point' , 'MaxIter', maxiter, 'MaxFunEvals', maxiter,...
                 'GradObj', 'on', 'GradConstr', 'on', 'OutputFcn', @outfun,...
                 'TolX', methodoptions.minstepsize);
         else
             % Use this otherwise
-            options = optimoptions('fmincon', 'MaxIterations', maxiter, 'MaxFunctionEvaluations', maxiter,...
+            options = optimoptions('fmincon', 'Algorithm', 'interior-point', 'MaxIterations', maxiter, 'MaxFunctionEvaluations', maxiter,...
                 'SpecifyObjectiveGradient', true, 'SpecifyConstraintGradient', true, 'OutputFcn', @outfun,...
                 'StepTolerance', methodoptions.minstepsize);
         end
         timetic = tic();
+        history = struct();
+        history.iter = [];
+        history.cost = [];
+        %history.maxviolation = [];
+        %history.meanviolation = [];
         [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], zeros(N*rankY, 1), [], @nonlcon, options);
         time = toc(timetic);
+        
+        history.iter(1,:) = [];
+        history.cost(1,:)  = [];
+        
+        filename = sprintf('KNN_fmincon_interior_point_nrep%dNum%dDim%dRank%d.csv',setting.repeat,...
+            setting.data_num, setting.data_dim, setting.rank);
+        struct2csv(history, filename);        
         
         xfinal = reshape(xfinal, [N, rankY]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
@@ -170,13 +201,72 @@
         data(3, 5) = time;
     end
 
+    if specifier.ind(6)
+        %FMINCON sequential qudratic programming
+        fprintf('Starting fmincon_SQP \n');
+        maxiter = methodoptions.maxOuterIter;
+        if specifier.matlabversion == 0
+            % Use this if you are at 2015a or older.
+            options = optimoptions('fmincon', 'Algorithm', 'sqp' , 'MaxIter', maxiter, 'MaxFunEvals', maxiter,...
+                'GradObj', 'on', 'GradConstr', 'on', 'OutputFcn', @outfun,...
+                'TolX', methodoptions.minstepsize);
+        else
+            % Use this otherwise
+            options = optimoptions('fmincon', 'Algorithm', 'sqp', 'MaxIterations', maxiter, 'MaxFunctionEvaluations', maxiter,...
+                'SpecifyObjectiveGradient', true, 'SpecifyConstraintGradient', true, 'OutputFcn', @outfun,...
+                'StepTolerance', methodoptions.minstepsize);
+        end
+        timetic = tic();
+        history = struct();
+        history.iter = [];
+        history.cost = [];
+        %history.maxviolation = [];
+        %history.meanviolation = [];
+        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], zeros(N*rankY, 1), [], @nonlcon, options);
+        time = toc(timetic);
+        
+        history.iter(1,:) = [];
+        history.cost(1,:)  = [];
+        
+        filename = sprintf('KNN_fmincon_SQP_nrep%dNum%dDim%dRank%d.csv',setting.repeat,...
+            setting.data_num, setting.data_dim, setting.rank);
+        struct2csv(history, filename);        
+        
+        xfinal = reshape(xfinal, [N, rankY]);
+        [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
+        data(1, 6) = output.constrviolation;
+        data(2, 6) = cost;
+        data(3, 6) = time;
+    end
+    
+    if specifier.ind(7)
+        %Riemannian SQP
+        fprintf('Starting Riemannian SQP \n');
+        timetic = tic();
+        [xfinal, costfinal, info, options] = SQP(problem, x0, options);
+        time = toc(timetic);
+
+        filename = sprintf('KNN_Riemannian_SQP_nrep%dNum%dDim%dRank%d.csv',setting.repeat,...
+            setting.data_num, setting.data_dim, setting.rank);
+        struct2csv(info, filename);
+        
+        [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
+        maxviolation = max(maxviolation, manifoldViolation(xfinal));
+        data(1, 7) = maxviolation;
+        data(2, 7) = cost;
+        data(3, 7) = time;
+    end
+    
      %------------------------sub functions-----------     
      
-     function stop = outfun(x,optimValues,state)
+    function stop = outfun(x, optimValues, state)
         stop = false;
         if toc(timetic) > methodoptions.maxtime
             stop = true;
         end
+        history.iter = [history.iter; optimValues.iteration];
+        history.cost = [history.cost;optimValues.fval];
+        %[history.maxviolation, history.meanviolation, cost] = evaluation(problem, x, condet);
     end 
      
     

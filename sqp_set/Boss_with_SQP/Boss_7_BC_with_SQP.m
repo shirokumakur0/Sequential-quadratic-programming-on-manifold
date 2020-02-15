@@ -4,7 +4,7 @@ close all; clear all; clc;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
 %dim_set = [10, 25, 30, 50, 60]; %dimension of the Adjacency Matrix
-dim_set = [5, 50, 75, 90, 100, 125, 150, 200];
+dim_set = [10, 50, 100, 150, 200, 400, 500, 750, 1000];
 density_set = [0.005, 0.01, 0.02, 0.04, 0.08]; %density of the Adjacency Matrix 
 
 
@@ -27,6 +27,7 @@ for repeat = 1 : n_repeat
             options.maxOuterIter = 5000;
             options.maxtime = 3600;
             options.minstepsize = 1e-4;
+            options.mineigval_correction = 1e-6;
             options.verbosity = 1;
 
             %________Setting________
@@ -48,6 +49,8 @@ for repeat = 1 : n_repeat
             else
                 specifier.ind = [0, 1, 1, 1, 1, 1, 1];
             end
+            
+            specifier.ind = [0,0,0,0,0,0,1];
             
             result = clientconstraint_oblique_balancedcut_with_SQP(L, rank, options, specifier, setting);
             result = result(:);

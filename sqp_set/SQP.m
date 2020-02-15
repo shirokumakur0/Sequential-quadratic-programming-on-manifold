@@ -180,7 +180,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
 
         % Make H, basis, and n
         [H,basis] = hessianmatrix(auxproblem, xCur);
-        qpinfo.H = (H.'+H)/2;
+        qpinfo.H = 0.5 * (H.'+H);
         qpinfo.basis = basis;
         qpinfo.n = numel(basis);
 
@@ -264,7 +264,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
                 qpinfo.H = qpinfo.H + qpinfo.mineigval_diagcoeff * eye(qpinfo.n);
             end
         end
-        qpinfo.H = (qpinfo.H.'+qpinfo.H)/2;
+        qpinfo.H = 0.5 * (qpinfo.H.'+qpinfo.H);
 
         % Compute the direction and Lagrange multipliers
         % by solving QP with quadprog, a matlab solver for QP
