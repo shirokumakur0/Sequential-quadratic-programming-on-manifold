@@ -4,9 +4,9 @@ close all; clear all; clc;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
 %dim_set = [10, 25, 30, 50, 60]; %dimension of the Adjacency Matrix
-dim_set = [10, 50, 100, 200];
-density_set = [0.005, 0.01, 0.02, 0.04, 0.08]; %density of the Adjacency Matrix 
-
+dim_set = [10, 50, 100, 200, 500, 1000];
+%density_set = [0.005, 0.01, 0.02, 0.04, 0.08]; %density of the Adjacency Matrix 
+density_set = [0.01, 0.02, 0.04, 0.08];
 
 n_repeat = 1;   %Number of repeat on same set of data
 rank = 2;     %Graph Bisection
