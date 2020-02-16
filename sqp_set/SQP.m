@@ -104,7 +104,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     % For display
     localdefaults.verbosity = 1;
     localdefaults.qp_verbosity = 0;
-    
+    localdefaults.qp_loop = 0;
+    localdefaults.qp_mineigval_max_pow = 10;
     % Merge global and local defaults, then merge w/ user options, if any.
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
     if ~exist('options', 'var') || isempty(options)
@@ -268,8 +269,28 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
 
         % Compute the direction and Lagrange multipliers
         % by solving QP with quadprog, a matlab solver for QP
-        [coeff, ~, qpexitflag, ~, Lagmultipliers] = quadprog(qpinfo.H, qpinfo.f,...
-            qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq, [], [], [], qpoptions);
+        
+        qp_mineigval_pow = 1;
+        while true
+            [coeff, ~, qpexitflag, ~, Lagmultipliers] = quadprog(qpinfo.H, qpinfo.f,...
+                qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq, [], [], [], qpoptions);
+            if options.qp_loop <= 0
+                break;
+            elseif qpexitflag == -6 && (strcmp(options.modify_hessian, 'mineigval_matlab') ||...
+                    strcmp(options.modify_hessian, 'mineigval_manopt'))
+                qpinfo.diagcoeff = max(options.mineigval_threshold,...
+                    abs(qpinfo.mineigval)) + options.mineigval_correction * pow(10, qp_mineigval_pow);
+                qpinfo.H = H + qpinfo.diagcoeff * eye(qpinfo.n);
+                qpinfo.H = 0.5 * (qpinfo.H.' + qpinfo.H);
+                qp_mineigval_pow = qp_mineigval_pow + 1;
+                if qp_mineigval_pow >= options.qp_mineigval_max_pow 
+                    break;
+                end
+            else
+                break;
+            end
+        end
+
         deltaXast = 0;
         for i = 1:qpinfo.n
             deltaXast = deltaXast + coeff(i)* qpinfo.basis{i};
@@ -401,6 +422,10 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             stats.ls_max_steps_break = NaN;
             stats.dist =  NaN;
             stats.qpexitflag = NaN;
+            if strcmp(options.modify_hessian, 'mineigval_matlab') ||...
+                    strcmp(options.modify_hessian, 'mineigval_manopt')
+                stats.qp_pow = NaN;
+            end
         else
             stats.time = toc(timetic);
             stats.time = info(iter).time + toc(timetic);
@@ -409,6 +434,10 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             stats.ls_max_steps_break = ls_max_steps_flag;
             stats.dist = dist;
             stats.qpexitflag = qpexitflag;
+            if strcmp(options.modify_hessian, 'mineigval_matlab') ||...
+                    strcmp(options.modify_hessian, 'mineigval_manopt')
+                stats.qp_pow = qp_mineigval_pow;
+            end
         end
         stats.rho = rho;
         stats.violation_sum = violation_sum();

@@ -20,12 +20,12 @@ data_table = { % data number, data dimesion, clusters
                50,  10,  4;
                60,  10,  5;
                80,  10,  5;
-              100,  50,  4;
-              200,  75,  5;
-              500, 100,  5};
+               100,  50,  4;
+               200,  75,  5;
+               500, 100,  5};
           
 [row_data_table,~] = size(data_table);
-n_repeat = 3;   % Number of repeat experiment
+n_repeat = 1;   % Number of repeat experiment
 
 for repeat = 1: n_repeat
     
@@ -42,8 +42,8 @@ for repeat = 1: n_repeat
         %________Experiment_____
         options.maxOuterIter = 5000;
         options.maxtime = 3600;
-        options.minstepsize = 1e-5;
-        options.mineigval_correction = 10;
+        options.minstepsize = 1e-6;
+        options.mineigval_correction = 100;
         options.verbosity = 1;
         
         %________Setting________
@@ -63,7 +63,6 @@ for repeat = 1: n_repeat
         else
             specifier.ind = [0, 1, 1, 1, 1, 1, 1];
         end
-                
         result = clientconstraint_stiefel_Kmeans_with_SQP(D, rank, options, specifier, setting);
         result = result(:);
         param = [dataset; repeat];
