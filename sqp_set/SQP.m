@@ -127,8 +127,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     end
     
     % Create a store database and get a key for the current x
-    storedb = StoreDB(options.storedepth);
-    key = storedb.getNewKey();
+    %storedb = StoreDB(options.storedepth);
+    %key = storedb.getNewKey();
     
     % Create some initial variables which will be used in the following
     % loop.
@@ -138,7 +138,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     
     % For the initial savestats, declare some variables
     iter = 0;
-    xCurCost = getCost(problem0, xCur, storedb, key);
+    xCurCost = getCost(problem0, xCur);
     xCurLagGrad = gradLagrangian(xCur, mus, lambdas);
     xCurLagGradNorm = problem0.M.norm(xCur, xCurLagGrad);
     timetic = tic();
@@ -186,7 +186,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
 
         % Make f
         f = zeros(qpinfo.n, 1);
-        xCurGrad = getGradient(problem0, xCur, storedb, key);
+        xCurGrad = getGradient(problem0, xCur);
         for fidx =1:qpinfo.n
             f(fidx) = problem0.M.inner(xCur, xCurGrad, basis{fidx});
         end
@@ -348,12 +348,12 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         lambdas =  Lagmultipliers.eqlin;
         
         % For savestats (Cont'd)
-        xCurCost = getCost(problem0, xCur, storedb, key);
+        xCurCost = getCost(problem0, xCur);
         xCurLagGrad = gradLagrangian(xCur, mus, lambdas);
         xCurLagGradNorm = problem0.M.norm(xCur, xCurLagGrad);        
         
         % savestats
-        key = storedb.getNewKey();
+        %key = storedb.getNewKey();
         stats = savestats();
         info(iter+1) = stats;
         
@@ -413,7 +413,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         stats.rho = rho;
         stats.violation_sum = violation_sum();
         [stats.maxviolation, stats.meanviolation] = const_evaluation(xCur);
-        stats = applyStatsfun(problem0, xCur, storedb, key, options, stats);
+        stats = applyStatsfun(problem0, xCur, [], [], options, stats);
     end
 
     function val = costLagrangian(x, mus, lambdas)
@@ -529,7 +529,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     end
     % For additiobal stats
     function val = violation_sum()
-        xGrad = getGradient(problem0, xCur, storedb, key);
+        xGrad = getGradient(problem0, xCur);
         val = problem0.M.norm(xCur, xGrad)^2;
         if condet.has_ineq_cost
             for numineq = 1: condet.n_ineq_constraint_cost
