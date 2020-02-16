@@ -9,7 +9,7 @@ dim_set = [10, 50, 100, 150, 250, 500, 1000];  % Dimension of "the Cov Matrix"
 %deltaset = [0.1, 0.3, 0.7, 0.9];           % Sparsity 
 
 snrset = [0.1, 0.25, 0.5, 1.0];
-deltaset = [0.3, 0.7];   
+deltaset = [0.3, 0.7, 0.9];   
 
 rank = 1;                                  % Rank of BM Relaxation. 1 if we don't.
 n_repeat = 1;                              % Number of repeat experiment
