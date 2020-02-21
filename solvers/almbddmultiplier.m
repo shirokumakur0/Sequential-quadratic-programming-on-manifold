@@ -27,6 +27,8 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
     
     lambdas = options.lambdas;
     gammas = options.gammas;
+    oldlambdas = lambdas;  % MO
+    oldgammas = gammas;  % MO
     rho = options.rho;
     oldacc = Inf;
     M = problem0.M;
@@ -54,6 +56,10 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
         inneroptions.verbosity = 0;
         inneroptions.maxiter = options.maxInnerIter;
         inneroptions.minstepsize = options.minstepsize;
+        
+        % For violation_sum (MO)
+        oldlambdas = lambdas;
+        oldgammas = gammas;
          
         [xCur, cost, innerinfo, Oldinneroptions] = rlbfgs(problem, xCur, inneroptions);
         
@@ -110,7 +116,7 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
         stats.maxviolation = maxviolation;
         stats.meanviolation = meanviolation;
         stats.cost = costCur;
-        % addding the information on Lagrange multipliers for sqp
+        % addding the information on Lagrange multipliers for sqp (MO)
         stats.lambdas = lambdas;
         stats.gammas = gammas;
         stats.violation_sum = violation_sum(); % (MO)
@@ -163,15 +169,19 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
     end
 
     % For additiobal stats (MO)
-    function val = violation_sum()
+     function val = violation_sum()
+        val = 0;
         xGrad = getGradient(problem0, xCur);
-        val = problem0.M.norm(xCur, xGrad)^2;
         if condet.has_ineq_cost
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem0.ineq_constraint_cost{numineq};
                 cost_at_x = costhandle(xCur);
                 violation = max(0, cost_at_x);
                 val = val + violation^2;
+                
+                gradhandle = problem0.ineq_constraint_grad{numineq};
+                grad_at_x = gradhandle(xCur);
+                xGrad = xGrad + oldlambdas(numineq) * grad_at_x;
             end
         end
         if condet.has_eq_cost
@@ -179,11 +189,16 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
                 costhandle = problem0.eq_constraint_cost{numeq};
                 cost_at_x = abs(costhandle(xCur));
                 val = val + cost_at_x^2;
+                
+                gradhandle = problem0.eq_constraint_grad{numeq};
+                grad_at_x = gradhandle(xCur);
+                xGrad = xGrad + oldgammas(numeq) * grad_at_x; 
             end
         end
+        val = val + problem0.M.norm(xCur, xGrad)^2;
         val = sqrt(val);
         %stats.violation_sum = val;
-    end
+     end
 end
 
 

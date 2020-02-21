@@ -190,7 +190,7 @@ condet = constraintsdetail(problem);
         sqpoptions.toliterdist = methodoptions.minstepsize;
         sqpoptions.verbosity = methodoptions.verbosity;
         timetic = tic();
-        [xfinal, costfinal, info, options] = SQP(problem, x0, sqpoptions);
+        [xfinal, costfinal, info, ~] = SQP(problem, x0, sqpoptions);
         time = toc(timetic);
         filename = sprintf('BC_Riemannian_SQP_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
         struct2csv(info, filename);

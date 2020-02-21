@@ -197,8 +197,10 @@ condet = constraintsdetail(problem);
         sqpoptions.tolgradnorm = methodoptions.minstepsize;
         sqpoptions.toliterdist = methodoptions.minstepsize;
         sqpoptions.verbosity = methodoptions.verbosity;
+        sqpoptions.mineigval_correction = methodoptions.mineigval_correction;
+
         timetic = tic();
-        [xfinal, costfinal, info, options] = SQP(problem, x0, sqpoptions);
+        [xfinal, costfinal, info,~] = SQP(problem, x0, sqpoptions);
         time = toc(timetic);
         filename = sprintf('NNPCA_Riemannian_SQP_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
         struct2csv(info, filename);        

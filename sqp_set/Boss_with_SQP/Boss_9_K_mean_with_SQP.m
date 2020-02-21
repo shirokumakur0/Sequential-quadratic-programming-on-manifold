@@ -11,19 +11,38 @@ specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 %               'vehicle.csv', 18, 4;
 %               'cloud.csv', 10, 4};
 data_table = { % data number, data dimesion, clusters
-               10,   5,  3;
-               25,   8,  3;
-               25,   6,  4;
-               30,   8,  4;
-               35,   7,  5;
-               40,   7,  5;
-               50,  10,  4;
-               60,  10,  5;
-               80,  10,  5;
-               100,  50,  4;
-               200,  75,  5;
-               500, 100,  5};
-          
+                5,   2,  2;%2;
+                6,   3,  2;%3;
+                7,   3,  2;%3;
+                8,   3,  3;%3;
+                9,   3,  3;%3;
+               10,   5,  3};%3;};
+               %25,   8,  3;
+               %25,   6,  4;
+               %30,   8,  4;
+               %35,   7,  5;
+               %40,   7,  5;
+               %50,  10,  4;
+               %60,  10,  5;
+               %80,  10,  5;
+               %100,  50,  4;
+               %200,  75,  5;
+               %500, 100,  5};
+               
+%data_table = { % data number, data dimesion, clusters
+               %10,   5,  3;
+               %25,   8,  3;
+               %25,   6,  4;
+               %30,   8,  4;
+               %35,   7,  5;
+               %40,   7,  5;
+               %50,  10,  4;
+               %60,  10,  5;
+               %80,  10,  5;
+               %100,  50,  4;
+               %200,  75,  5;
+               %500, 100,  5};
+               
 [row_data_table,~] = size(data_table);
 n_repeat = 1;   % Number of repeat experiment
 
@@ -42,8 +61,8 @@ for repeat = 1: n_repeat
         %________Experiment_____
         options.maxOuterIter = 5000;
         options.maxtime = 3600;
-        options.minstepsize = 1e-6;
-        options.mineigval_correction = 100;
+        options.minstepsize = 1e-8;
+        options.mineigval_correction = 1e-5;
         options.verbosity = 1;
         
         %________Setting________
@@ -63,6 +82,8 @@ for repeat = 1: n_repeat
         else
             specifier.ind = [0, 1, 1, 1, 1, 1, 1];
         end
+        % specifier.ind = [0, 0, 0, 0, 0, 0, 1];
+        % specifier.ind = [0, 0, 0, 0, 0, 0, 1];
         result = clientconstraint_stiefel_Kmeans_with_SQP(D, rank, options, specifier, setting);
         result = result(:);
         param = [dataset; repeat];

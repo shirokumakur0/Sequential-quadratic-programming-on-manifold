@@ -31,6 +31,8 @@ problem.eq_constraint_hess = eq_constraints_hess;
 
 A = rand(N) * rand(N).';
 A = 0.5 * (A+A.');
+setting.A = A;
+
 ineq_constraints_cost = cell(1,1);
 ineq_constraints_cost{1} = @(U) trace((U) * A * (U.')) - rand(1);
 ineq_constraints_grad = cell(1,1);
@@ -205,7 +207,7 @@ condet = constraintsdetail(problem);
         sqpoptions.toliterdist = methodoptions.minstepsize;
         sqpoptions.verbosity = methodoptions.verbosity;
         timetic = tic();
-        [xfinal, costfinal, info, options] = SQP(problem, x0, sqpoptions);
+        [xfinal, costfinal, info, ~] = SQP(problem, x0, sqpoptions);
         time = toc(timetic);
         filename = sprintf('AO_Riemannian_SQP_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
         struct2csv(info, filename);

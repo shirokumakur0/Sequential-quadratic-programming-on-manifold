@@ -42,8 +42,6 @@
             ineq_constraints_grad{(col-1)*N + row} = @(Y) constraintgrad;
         end
     end
-    
-
     ineq_constraints_hess = cell(1, N * rankY);
     for row = 1: N
         for col = 1: rankY
@@ -152,7 +150,7 @@
         [xfinal, info] = exactpenaltyViaSmoothinglse(problem, x0, options);
         time = toc(timetic);
 
-        filename = sprintf('KNN_LQH_nrep%dNum%dDim%dRank%d.csv',setting.repeat,...
+        filename = sprintf('KNN_LSE_nrep%dNum%dDim%dRank%d.csv',setting.repeat,...
             setting.data_num, setting.data_dim, setting.rank);
         struct2csv(info, filename);
         
@@ -184,7 +182,7 @@
         history.cost = [];
         %history.maxviolation = [];
         %history.meanviolation = [];
-        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], zeros(N*rankY, 1), [], @nonlcon, options);
+        [xfinal, fval, ~, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], zeros(N*rankY, 1), [], @nonlcon, options);
         time = toc(timetic);
         
         history.iter(1,:) = [];
@@ -193,7 +191,6 @@
         filename = sprintf('KNN_fmincon_interior_point_nrep%dNum%dDim%dRank%d.csv',setting.repeat,...
             setting.data_num, setting.data_dim, setting.rank);
         struct2csv(history, filename);        
-        
         xfinal = reshape(xfinal, [N, rankY]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         data(1, 5) = output.constrviolation;
@@ -201,6 +198,8 @@
         data(3, 5) = time;
     end
 
+    % for i = 1: 10 % debug
+    %  x0 = M.rand();
     if specifier.ind(6)
         %FMINCON sequential qudratic programming
         fprintf('Starting fmincon_SQP \n');
@@ -222,9 +221,11 @@
         history.cost = [];
         %history.maxviolation = [];
         %history.meanviolation = [];
-        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], zeros(N*rankY, 1), [], @nonlcon, options);
+        [xfinal, fval, ~, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], zeros(N*rankY, 1), [], @nonlcon, options);
         time = toc(timetic);
-        
+        % xfinal
+        % problem.cost(x0)
+        % fval
         history.iter(1,:) = [];
         history.cost(1,:)  = [];
         
@@ -238,14 +239,22 @@
         data(2, 6) = cost;
         data(3, 6) = time;
     end
-    
+    %end % debug
     if specifier.ind(7)
         %Riemannian SQP
         fprintf('Starting Riemannian SQP \n');
+        sqpoptions.maxtime = methodoptions.maxtime;
+        sqpoptions.maxiter = methodoptions.maxOuterIter;
+        sqpoptions.tolqpnorm = methodoptions.minstepsize;
+        sqpoptions.tolgradnorm = methodoptions.minstepsize;
+        sqpoptions.toliterdist = methodoptions.minstepsize;
+        sqpoptions.mineigval_correction = methodoptions.mineigval_correction;
+        sqpoptions.verbosity = methodoptions.verbosity;
+        
         timetic = tic();
-        [xfinal, costfinal, info, options] = SQP(problem, x0, options);
+        [xfinal, costfinal, info, ~] = SQP(problem, x0, sqpoptions);
         time = toc(timetic);
-
+        
         filename = sprintf('KNN_Riemannian_SQP_nrep%dNum%dDim%dRank%d.csv',setting.repeat,...
             setting.data_num, setting.data_dim, setting.rank);
         struct2csv(info, filename);

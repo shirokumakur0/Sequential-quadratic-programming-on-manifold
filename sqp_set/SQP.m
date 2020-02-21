@@ -37,19 +37,6 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
 % between parentheses:
 %                     LATER!
 %
-% Please cite the Manopt paper as well as the research paper:
-% @InBook{Obara2020,
-%   title     = {},
-%   author    = {},
-%   year      = {},
-%   publisher = {},
-%   editor    = {},
-%   address   = {},
-%   booktitle = {},
-%   pages     = {},
-%   doi       = {}
-% }
-%
 %
 % Original author: Mitsuaki Obara, January 20, 2020.
 % Contributors: 
@@ -78,18 +65,17 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     
     % Set localdefaults, a struct to be combined with argument options for
     % declaring hyperparameters.
-    
     % For stopping criteria
     localdefaults.maxiter = 5000;
     localdefaults.maxtime = 3600;
-    localdefaults.tolqpnorm = 1e-5;
-    localdefaults.tolgradnorm = 1e-5;
-    localdefaults.toliterdist = 1e-5;
+    localdefaults.tolqpnorm = 1e-8;
+    localdefaults.tolgradnorm = 1e-8;
+    localdefaults.toliterdist = 1e-8;
     % For StoreDB
     localdefaults.storedepth = 3;
     % For modification for the hessian matrix to be positive semidefinete.
     localdefaults.modify_hessian = 'mineigval_matlab';
-    localdefaults.mineigval_correction = 1e-8; % the param for mineigval_manopt or _matlab
+    localdefaults.mineigval_correction = 1e-7; % the param for mineigval_manopt or _matlab
     localdefaults.mineigval_threshold = 1e-3;
     % Initial parameters for the merit function and the Lagrangian
     localdefaults.tau = 0.8;  % TODO: should find an appropriate value as long as tau > 0
@@ -104,8 +90,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     % For display
     localdefaults.verbosity = 1;
     localdefaults.qp_verbosity = 0;
-    localdefaults.qp_loop = 0;
-    localdefaults.qp_mineigval_max_pow = 10;
+    
     % Merge global and local defaults, then merge w/ user options, if any.
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
     if ~exist('options', 'var') || isempty(options)
@@ -178,18 +163,49 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         auxproblem.cost = costLag;
         auxproblem.grad = gradLag;
         auxproblem.hess = hessLag;
+        qpinfo = struct();
 
-        % Make H, basis, and n
-        [H,basis] = hessianmatrix(auxproblem, xCur);
-        qpinfo.H = 0.5 * (H.'+H);
-        qpinfo.basis = basis;
-        qpinfo.n = numel(basis);
-
+        % Make H, basis, and n and also, if needed,
+        % modify qpinfo.H (Hessian matrix) to be positive definite somehow.
+        % The difference between mineiegval_matlab and mineigval_manopt is
+        % correct negative eigenvalues respectively or altogther.
+        if strcmp(options.modify_hessian, "eye")
+            qpinfo.basis = tangentorthobasis(auxproblem.M, xCur, auxproblem.M.dim());
+            qpinfo.n = numel(qpinfo.basis);
+            % The identity matrix as replacement to Hessian.
+            qpinfo.H = eye(qpinfo.n);
+        elseif strcmp(options.modify_hessian, 'mineigval_matlab') 
+            % The eigenvalue decomposition function on matlab
+            [qpinfo.H, qpinfo.basis] = hessianmatrix(auxproblem, xCur);
+            qpinfo.n = numel(qpinfo.basis);
+            [U,T] = schur(qpinfo.H);
+            for i = 1 : qpinfo.n
+                if T(i,i) < 1e-5  
+                    T(i,i) = options.mineigval_correction;
+                end
+            end
+            qpinfo.H = U * T * U';
+        elseif strcmp(options.modify_hessian, 'mineigval_manopt')
+            [qpinfo.H, qpinfo.basis] = hessianmatrix(auxproblem, xCur);
+            qpinfo.n = numel(qpinfo.basis);
+            % Rayleigh quotient minization to get get a minimum eigenvalue.
+            [~ ,qpinfo.mineigval] = hessianextreme(auxproblem, xCur);
+            if qpinfo.mineigval < 0
+                qpinfo.mineigval_diagcoeff = max(options.mineigval_threshold,...
+                    abs(qpinfo.mineigval)) + options.mineigval_correction;
+                qpinfo.H = qpinfo.H + qpinfo.mineigval_diagcoeff * eye(qpinfo.n);
+            end
+        else
+            [qpinfo.H,qpinfo.basis] = hessianmatrix(auxproblem, xCur);
+            qpinfo.n = numel(qpinfo.basis);
+        end
+        qpinfo.H = 0.5 * (qpinfo.H.'+qpinfo.H);
+        
         % Make f
         f = zeros(qpinfo.n, 1);
         xCurGrad = getGradient(problem0, xCur);
         for fidx =1:qpinfo.n
-            f(fidx) = problem0.M.inner(xCur, xCurGrad, basis{fidx});
+            f(fidx) = problem0.M.inner(xCur, xCurGrad, qpinfo.basis{fidx});
         end
         qpinfo.f = f;
 
@@ -240,56 +256,11 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         end
         qpinfo.Aeq = Aeq;
         qpinfo.beq = beq;
-        
-        % Modify qpinfo.H (Hessian matrix) to be positive definite somehow.
-        % The difference between mineiegval_manopt and mineigval_matlab is
-        % a solver for calculating the minimum eigen value.
-        if strcmp(options.modify_hessian, "eye")
-            % The identity matrix as replacement to Hessian.
-            qpinfo.H = eye(qpinfo.n);
-        elseif strcmp(options.modify_hessian, 'mineigval_matlab') 
-            % The eigenvalue decomposition function on matlab
-            eigval = eig(qpinfo.H);
-            qpinfo.mineigval = min(eigval);
-            if qpinfo.mineigval < 0
-                qpinfo.mineigval_diagcoeff= max(options.mineigval_threshold,...
-                    abs(qpinfo.mineigval)) + options.mineigval_correction;
-                qpinfo.H = qpinfo.H + qpinfo.mineigval_diagcoeff * eye(qpinfo.n);
-            end
-        elseif strcmp(options.modify_hessian, 'mineigval_manopt')
-            % Rayleigh quotient minization to get get a minimum eigenvalue.
-            [~ ,qpinfo.mineigval] = hessianextreme(auxproblem, xCur);
-            if qpinfo.mineigval < 0
-                qpinfo.mineigval_diagcoeff = max(options.mineigval_threshold,...
-                    abs(qpinfo.mineigval)) + options.mineigval_correction;
-                qpinfo.H = qpinfo.H + qpinfo.mineigval_diagcoeff * eye(qpinfo.n);
-            end
-        end
-        qpinfo.H = 0.5 * (qpinfo.H.'+qpinfo.H);
 
         % Compute the direction and Lagrange multipliers
         % by solving QP with quadprog, a matlab solver for QP
-        
-        qp_mineigval_pow = 1;
-        while true
-            [coeff, ~, qpexitflag, ~, Lagmultipliers] = quadprog(qpinfo.H, qpinfo.f,...
-                qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq, [], [], [], qpoptions);
-            if options.qp_loop <= 0
-                break;
-            elseif qpexitflag == -6 && (strcmp(options.modify_hessian, 'mineigval_matlab') ||...
-                    strcmp(options.modify_hessian, 'mineigval_manopt'))
-                qpinfo.diagcoeff = max(options.mineigval_threshold,...
-                    abs(qpinfo.mineigval)) + options.mineigval_correction * pow(10, qp_mineigval_pow);
-                qpinfo.H = H + qpinfo.diagcoeff * eye(qpinfo.n);
-                qpinfo.H = 0.5 * (qpinfo.H.' + qpinfo.H);
-                qp_mineigval_pow = qp_mineigval_pow + 1;
-                if qp_mineigval_pow >= options.qp_mineigval_max_pow 
-                    break;
-                end
-            else
-                break;
-            end
-        end
+        [coeff, ~, qpexitflag, ~, Lagmultipliers] = quadprog(qpinfo.H, qpinfo.f,...
+                qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq, [], [], [], qpoptions);     
 
         deltaXast = 0;
         for i = 1:qpinfo.n
@@ -318,21 +289,8 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         f0 = meritproblem.cost(xCur);
         
         % Compute df0 according to options.modify_hessian
-        if strcmp(options.modify_hessian, "eye")
-            df0 = meritproblem.M.inner(xCur, deltaXast, deltaXast);
-        elseif strcmp(options.modify_hessian, 'mineigval_matlab') || strcmp(options.modify_hessian, 'mineigval_manopt')
-            if qpinfo.mineigval < 0
-                df0 = meritproblem.M.inner(xCur, hessLagrangian(xCur, deltaXast,...
-                    mus, lambdas) + qpinfo.mineigval_diagcoeff * deltaXast, deltaXast);
-            else 
-                df0 = meritproblem.M.inner(xCur, hessLagrangian(xCur, deltaXast,...
-                    mus, lambdas), deltaXast);
-            end
-        else % Standard setting
-            df0 = meritproblem.M.inner(xCur, hessLagrangian(xCur, deltaXast,...
-                    mus, lambdas), deltaXast);
-        end
-        
+        df0 = (coeff.') * (qpinfo.H) * (coeff);
+
         % Compute the stepsize with the L1-type merit function and the Armijo rule
         stepsize = 1;
         newx = meritproblem.M.retr(xCur, deltaXast, stepsize);
@@ -357,12 +315,12 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         end
         
         % For savestats
-        % qpsolnorm = stepsize * problem0.M.norm(xCur, deltaXast);
         if contains(problem0.M.name(),'Stiefel')
             dist = norm(xCur - newx, 'fro');
         else
             dist = problem0.M.dist(xCur, newx);
         end
+        
         % Update variables to new iterate
         xCur = newx;
         mus = Lagmultipliers.ineqlin;
@@ -391,10 +349,6 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             fprintf('Legrangian Gradient norm tolerance reached \n');
             options.reason = "Legrangian Gradient norm tolerance reached";
             stop = true;
-        %elseif qpsolnorm <= options.tolqpnorm
-        %    fprintf('QP solution norm with stepsize tolerance reached\n');
-        %    options.reason = "Legrangian Gradient norm tolerance reached";
-        %    stop = true;
         elseif dist <= options.toliterdist
             fprintf('Distance of iteration tolerance reached\n');
             options.reason = 'Distance of iteration tolerance reached';
@@ -405,6 +359,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             options.totaltime = toc(totaltime);
             break
         end
+        
     end
     
     xfinal = xCur;
@@ -412,32 +367,24 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     
     % Routine in charge of collecting the current iteration stats
     function stats = savestats()
+        % stats.xcurrent = xCur; % Only for DEBUG
         stats.iter = iter;
         stats.cost = xCurCost;
         stats.gradnorm = xCurLagGradNorm;
         if iter == 0
             stats.time = toc(timetic);
-            % stats.qpsolnorm = NaN;
             stats.stepsize = NaN;
             stats.ls_max_steps_break = NaN;
             stats.dist =  NaN;
             stats.qpexitflag = NaN;
-            if strcmp(options.modify_hessian, 'mineigval_matlab') ||...
-                    strcmp(options.modify_hessian, 'mineigval_manopt')
-                stats.qp_pow = NaN;
-            end
+
         else
             stats.time = toc(timetic);
             stats.time = info(iter).time + toc(timetic);
-            % stats.qpsolnorm = qpsolnorm;
             stats.stepsize = stepsize;
             stats.ls_max_steps_break = ls_max_steps_flag;
             stats.dist = dist;
             stats.qpexitflag = qpexitflag;
-            if strcmp(options.modify_hessian, 'mineigval_matlab') ||...
-                    strcmp(options.modify_hessian, 'mineigval_manopt')
-                stats.qp_pow = qp_mineigval_pow;
-            end
         end
         stats.rho = rho;
         stats.violation_sum = violation_sum();
@@ -558,7 +505,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     end
     % For additiobal stats
     function val = violation_sum()
-        xGrad = getGradient(problem0, xCur);
+        xGrad = gradLagrangian(xCur, mus, lambdas);
         val = problem0.M.norm(xCur, xGrad)^2;
         if condet.has_ineq_cost
             for numineq = 1: condet.n_ineq_constraint_cost
@@ -576,6 +523,5 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             end
         end
         val = sqrt(val);
-        %stats.violation_sum = val;
     end
 end

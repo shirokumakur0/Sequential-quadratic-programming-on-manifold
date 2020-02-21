@@ -4,7 +4,8 @@
 close all; clc; clear all;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
-dim_set = [10, 50, 100, 150, 250, 500, 1000];  % Dimension of "the Cov Matrix"
+dim_set = [5, 10, 15, 20, 25, 30, 50];
+%dim_set = [10, 50, 100, 150, 250, 500, 1000];  % Dimension of "the Cov Matrix"
 %snrset = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0]; % Signal Strength
 %deltaset = [0.1, 0.3, 0.7, 0.9];           % Sparsity 
 
@@ -39,9 +40,8 @@ for repeat = 1: n_repeat
                 %________Experiment_____
                 options.maxOuterIter = 5000;
                 options.maxtime = 3600;
-                options.minstepsize = 1e-4;
-                options.mineigval_correction = 0;
-                options.mineigval_correction = 1e-10;
+                options.minstepsize = 1e-8;
+                options.mineigval_correction = 1e-12;
                 options.verbosity = 1;
                 
                 %________Setting________
@@ -50,6 +50,7 @@ for repeat = 1: n_repeat
                 setting.snr = snr;
                 setting.delta = delta;
                 setting.rank = rank;
+                setting.mineigval_correction = options.mineigval_correction;
                 setting.maxOuterIter = options.maxOuterIter;
                 setting.maxtime = options.maxtime;
                 setting.minstepsize = options.minstepsize;

@@ -5,35 +5,36 @@ function plotperfprof
     ftol = 1.02; % the tolerance ratio of function value
     constrtol = 5e-4; % Max violation of constraint.
 
+    % AO
+    %filenames = ["with_SQP_zz_AO_Dim5.dat", "with_SQP_zz_AO_Dim10.dat",...
+    %    "with_SQP_zz_AO_Dim15.dat"];
+    %titlenames = ["Dimension 5", "Dimension 10", "Dimension 15"];
+    %locs = {'southeast','southeast','southeast'};
+    %set_num = 3;
     
-    % BC 
-    %filenames = ["zz_BC_Dim50.dat", "zz_BC_Dim200.dat",...
-    %    "zz_BC_Dim500.dat", "zz_BC_Dim1000.dat", ...
-    %    "zz_BC_Dim2000.dat", "zz_BC_Dim5000.dat"];
-    %filenames = ["zz_BC_Dim50MSe7.dat", "zz_BC_Dim200MSe7.dat",...
-    %    "zz_BC_Dim500MSe7.dat", "zz_BC_Dim1000MSe7.dat", ...
-    %    "zz_BC_Dim2000MSe7.dat", "zz_BC_Dim5000MSe7.dat"];
-    %titlenames = ["Dimension 50", "Dimension 200",...
-    %    "Dimension 500", "Dimension 1000",...
-    %    "Dimension 2000", "Dimension 5000"];
-    %locs = {'southeast','southeast','southeast','southeast','southeast','northwest'};
-    
-    
+    % BC
+    %filenames = ["with_SQP_zz_BC_Dim5.dat", "with_SQP_zz_BC_Dim10.dat",...
+    %    "with_SQP_zz_BC_Dim15.dat", "with_SQP_zz_BC_Dim20.dat","with_SQP_zz_BC_Dim25.dat",...
+    %    "with_SQP_zz_BC_Dim30.dat"];
+    %titlenames = ["Dimension 5", "Dimension 10", "Dimension 15",...
+    %    "Dimension 20","Dimension 25","Dimension 30"];
+    %locs = {'southeast','southeast','southeast','southeast','southeast','southeast'};
+    %set_num = 6;
     
     %NNPCA
-    filenames = ["with_SQP_zz_NNPCA_Dim10.dat", "with_SQP_zz_NNPCA_Dim25.dat",...
-        "with_SQP_zz_NNPCA_Dim50.dat", "with_SQP_zz_NNPCA_Dim75.dat", ...
-        "with_SQP_zz_NNPCA_Dim100.dat"];
-    titlenames = ["Dimension 10", "Dimension 25", "Dimension 50",...
-        "Dimension 75", "Dimension 100"];
-    locs = {'southeast','southeast','southeast','southeast','southeast'};
+    filenames = ["with_SQP_zz_NNPCA_Dim5.dat", "with_SQP_zz_NNPCA_Dim10.dat",...
+        "with_SQP_zz_NNPCA_Dim15.dat", "with_SQP_zz_NNPCA_Dim20.dat", ...
+       "with_SQP_zz_NNPCA_Dim25.dat","with_SQP_zz_NNPCA_Dim30.dat","with_SQP_zz_NNPCA_Dim50.dat"];
+    titlenames = ["Dimension 5", "Dimension 10", "Dimension 15",...
+        "Dimension 20", "Dimension 25", "Dimension 30", "Dimension 50"];
+    locs = {'southeast','southeast','southeast','southeast','southeast','southeast','southeast'};
+    set_num = 7;
     
     
-    
-    startingsolver = [1 2 2 2 2 2];
+    startingsolver = [1 2 2 2 2 2 2];
     fig = figure;
     
-    for plotnum = 1:5
+    for plotnum = 1:set_num % 7 NNPCA % 6 BC, AO
     
         filename = filenames{plotnum};
 
@@ -48,8 +49,9 @@ function plotperfprof
             extable(extable == 0) = eps;
             [T(ii, :), ~,~,~] = timeplotprof(extable, ftol, constrtol);
         end
-
-        subplot(3,2,plotnum) 
+        %subplot(2,2,plotnum);  % AO
+        %subplot(3,2,plotnum);  % BC
+        subplot(4,2,plotnum); %NNPCA
         perf(T(:,startingsolver(plotnum):7), 1, plotnum);
     end
     
@@ -68,7 +70,7 @@ function plotperfprof
               0.75 0.75 0;
               0.25 0.25 0.25];
         
-        lines = {'--' '-' '-.' '-' '--' '--'};
+        lines = {'--' '-' '-.' '-' '--' '--', '--'};
        
         markers = [' ' ' ' ' ' ' ' ' ' '.' '.' ' '];
        
@@ -112,10 +114,10 @@ function plotperfprof
         %axis([ 0 2*(max_ratio)+0.01 0 1 ]);
         
         
-        if ns == 6
-            legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon', 'REPMSD','SQP'},'Location',locs{plotnum},'Interpreter','latex');
+        if ns == 7
+            legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon_interior_point', 'fmincon_SQP','Riemannian SQP','REPMSD'},'Location',locs{plotnum},'Interpreter','latex');
         else
-            legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon','SQP'},'Location',locs{plotnum},'Interpreter','latex');
+            legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon_interior_point','fmincon_SQP','Riemannian SQP'},'Location',locs{plotnum},'Interpreter','latex');
         end
         ylabel('Performance Profile');
         xlabel('$$\log_2\tau$','Interpreter','latex');
