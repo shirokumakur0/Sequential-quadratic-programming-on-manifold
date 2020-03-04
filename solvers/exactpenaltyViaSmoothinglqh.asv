@@ -1,4 +1,4 @@
-function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
+function [xfinal,info] = exactpenaltyViaSmoothinglqh (problem0, x0, options)
 
     condet = constraintsdetail(problem0);
     
@@ -10,13 +10,12 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
     localdefaults.startingepsilon = 1e-1;
     localdefaults.endingepsilon = 1e-6;
     localdefaults.outerverbosity = 1;  % verbosity for outer loops by MO
-    localdefaults.tolKKTres = 1e-8; % a stopping criterion, added by MO
-    localdefaults.minstepsize = 1e-10;  % added by MO
+    localdefaults.tolviosum = 1e-8; % a stopping criterion, added by MO
     %Inner Loop Setting
     localdefaults.maxInnerIter = 200;
     localdefaults.startingtolgradnorm = 1e-3;
     localdefaults.endingtolgradnorm = 1e-6;
-    
+
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
     if ~exist('options', 'var') || isempty(options)
         options = struct();
@@ -33,7 +32,6 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
     epsilon = options.startingepsilon;
     rho = options.rho;
     
-    
     % for savestats, by MO
     xCurMaxLagMult = maxabsLagrangemultipliers(xCur, problem0, epsilon);
     xCurResidual = KKT_residual();
@@ -42,7 +40,7 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
     stats = savestats(x0);
     info(1) = stats;
     info(min(10000, options.maxOuterIter+1)).iter = [];
-    
+
     totaltime = tic();
     
     for OuterIter = 1 : options.maxOuterIter
@@ -54,7 +52,7 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
         elseif options.verbosity == 1 && mod(OuterIter, 100) == 0 
             fprintf('Iteration: %d    ', OuterIter);
         end
-        
+
         costfun = @(X) cost_exactpenalty(X, problem0, rho);
         gradfun = @(X) grad_exactpenalty(X, problem0, rho);
         problem.cost = costfun;
@@ -84,7 +82,7 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
             dist = norm(xCurmat - xPrevmat, 'fro');
             xCurmat = xPrevmat;
         else
-            dist = problem0.M.dist(xCur, xPrev);
+            dist = problem0.M.dist(xCur, x);
         end
         
         %Save stats
@@ -107,24 +105,26 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
         
         % This is the stopping criterion based on violation_sum by MO on
         % March 4.
-        if xCurResidual < options.tolKKTres && tolgradnorm <= options.endingtolgradnorm
+        if xCurResidual < options.tolviosum && tolgradnorm <= options.endingtolgradnorm
             break;
         end
-        % The following part (norm based judging) is modifiied by MO,
+        % The following part (norm judge and breaking) is modifiied by MO,
         % March 2
-        % if contains(problem0.M.name(),'rank')  % Only assuming for 'fixedrankembeddedfactory'.
-        %     if ~exist('xPrevMat', 'var')
-        %         xPrevMat = xPrev.U * xPrev.S * xPrev.V';
-        %     end
-        %     xCurMat = xCur.U * xCur.S * xCur.V';
-        %     if norm(xPrevMat - xCurMat, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
-        %         break;
-        %     end
-        %     xPrevMat = xCurMat;
-        % elseif norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
-        %     break;
-        % end
-        % The original one, just a heritage
+        % for fixedrankembeddedfactory
+        %if contains(problem0.M.name(),'rank')  % Only assuming for 'fixedrankembeddedfactory'.
+        %    if ~exist('xPrevMat', 'var')
+        %        xPrevMat = xPrev.U * xPrev.S * xPrev.V';
+        %    end
+        %    xCurMat = xCur.U * xCur.S * xCur.V';
+        %    if norm(xPrevMat - xCurMat, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
+        %        break;
+        %    end
+        %    xPrevMat = xCurMat;
+        %elseif norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
+        %    break;
+        %end
+        %
+        % The original stopping criterion, remained here just in case
         % if norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
         %     break;
         % end
@@ -135,8 +135,9 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
         if toc(totaltime) > options.maxtime
             break;
         end
+        
     end
-
+    
     info = info(1: OuterIter+1);
     
     xfinal = xCur;
@@ -145,10 +146,10 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
         stats.iter = OuterIter;
         if stats.iter == 0
             stats.time = 0;
-            stats.dist = NaN;  % by MO
+            stats.dist = NaN; % by MO
         else
             stats.time = info(OuterIter).time + toc(timetic);
-            stats.dist = dist;  % by MO
+            stats.dist = dist; % by MO
         end
         [maxviolation, meanviolation, costCur] = evaluation(problem0, x, condet);
         stats.maxviolation = maxviolation;
@@ -158,58 +159,67 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
         stats.maxabsLagMult = xCurMaxLagMult;  % added by MO
         stats.KKT_residual = xCurResidual;  % added by MO
     end
+    
 
     function val = cost_exactpenalty(x, problem, rho)
         val = getCost(problem, x);
         % Adding ineq constraint cost
         if condet.has_ineq_cost
-            for numineq = 1 : condet.n_ineq_constraint_cost
+            for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem.ineq_constraint_cost{numineq};
                 cost_at_x = costhandle(x);
-                s = max(0, cost_at_x);
-                additional_cost = s + epsilon * log( exp((cost_at_x - s)/epsilon) + exp(-s/epsilon));
-                val = val + rho * additional_cost;
+                if cost_at_x <= 0
+                    cost_at_x = 0;
+                elseif cost_at_x > epsilon
+                        cost_at_x = cost_at_x - epsilon/2;
+                else
+                    cost_at_x = cost_at_x^2/(2*epsilon);
+                end
+                val = val + rho*cost_at_x;
             end
         end
-        %Eq constraint cost
+        %Eq constratint cost
         if condet.has_eq_cost
             for numeq = 1 : condet.n_eq_constraint_cost
                 costhandle = problem.eq_constraint_cost{numeq};
                 cost_at_x = costhandle(x);
-                s = max(-cost_at_x, cost_at_x);
-                additional_cost = s + epsilon * log( exp((cost_at_x - s)/epsilon) + exp((-cost_at_x-s)/epsilon));
-                val = val + rho * additional_cost;
+                val = val + rho * sqrt(cost_at_x^2 + epsilon^2);
             end
         end
     end
 
-    function val = grad_exactpenalty(x, problem, rho)
+    function val = grad_exactpenalty(x, problem, u)
         val = getGradient(problem, x);
         if condet.has_ineq_cost
-            for numineq = 1 : condet.n_ineq_constraint_cost
+            for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem.ineq_constraint_cost{numineq};            
                 cost_at_x = costhandle(x);
-                s = max(0, cost_at_x);
-                gradhandle = problem.ineq_constraint_grad{numineq};
-                constraint_grad = gradhandle(x);
-                constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-                coef = rho * exp((cost_at_x-s)/epsilon)/(exp((cost_at_x-s)/epsilon)+exp(-s/epsilon));
-                val = problem.M.lincomb(x, 1, val, coef, constraint_grad);
+                if cost_at_x >= 0
+                    gradhandle = problem.ineq_constraint_grad{numineq};
+                    constraint_grad = gradhandle(x);
+                    constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
+                    if cost_at_x >= epsilon
+                        coef = 1;
+                    else
+                        coef = cost_at_x/epsilon;
+                    end
+                    val = problem.M.lincomb(x, 1, val, u * coef, constraint_grad);
+                end
             end
         end
         if condet.has_eq_cost
-            for numineq = 1 : condet.n_eq_constraint_cost
+            for numineq = 1: condet.n_eq_constraint_cost
                 costhandle = problem.eq_constraint_cost{numineq};            
                 cost_at_x = costhandle(x);
-                s = max(-cost_at_x, cost_at_x);
                 gradhandle = problem.eq_constraint_grad{numineq};
                 constraint_grad = gradhandle(x);
                 constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-                coef = rho * (exp((cost_at_x-s)/epsilon)-exp((-cost_at_x-s)/epsilon))/(exp((cost_at_x-s)/epsilon)+exp((-cost_at_x-s)/epsilon));
-                val = problem.M.lincomb(x, 1, val, coef, constraint_grad);
+                coef = cost_at_x/sqrt(cost_at_x^2+epsilon^2);
+                val = problem.M.lincomb(x, 1, val, u * coef, constraint_grad);
             end 
         end
     end
+
     % Added by MO
     function val = KKT_residual()
         grad = gradLag(xCur, problem0, epsilon);

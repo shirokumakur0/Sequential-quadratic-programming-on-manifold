@@ -5,30 +5,34 @@ function plotperfprof
     ftol = 1.02; % the tolerance ratio of function value
     constrtol = 5e-4; % Max violation of constraint.
 
-    % AO
-    %filenames = ["with_SQP_zz_AO_Dim5.dat", "with_SQP_zz_AO_Dim10.dat",...
-    %    "with_SQP_zz_AO_Dim15.dat"];
-    %titlenames = ["Dimension 5", "Dimension 10", "Dimension 15"];
-    %locs = {'southeast','southeast','southeast'};
-    %set_num = 3;
+
     
-    % BC
-    %filenames = ["with_SQP_zz_BC_Dim5.dat", "with_SQP_zz_BC_Dim10.dat",...
-    %    "with_SQP_zz_BC_Dim15.dat", "with_SQP_zz_BC_Dim20.dat","with_SQP_zz_BC_Dim25.dat",...
-    %    "with_SQP_zz_BC_Dim30.dat"];
-    %titlenames = ["Dimension 5", "Dimension 10", "Dimension 15",...
+    % AO
+    %filenames = ["with_SQP_zz_AO_Dim10.dat",...
+    %    "with_SQP_zz_AO_Dim15.dat", "with_SQP_zz_AO_Dim20.dat","with_SQP_zz_AO_Dim25.dat",...
+    %    "with_SQP_zz_AO_Dim30.dat"];
+    %titlenames = ["Dimension 10", "Dimension 15",...
     %    "Dimension 20","Dimension 25","Dimension 30"];
     %locs = {'southeast','southeast','southeast','southeast','southeast','southeast'};
-    %set_num = 6;
+    %set_num = 5;
+    
+    % BC
+    %filenames = ["with_SQP_zz_BC_Dim10.dat",...
+    %    "with_SQP_zz_BC_Dim15.dat", "with_SQP_zz_BC_Dim20.dat","with_SQP_zz_BC_Dim25.dat",...
+    %    "with_SQP_zz_BC_Dim30.dat"];
+    %titlenames = ["Dimension 10", "Dimension 15",...
+    %    "Dimension 20","Dimension 25","Dimension 30"];
+    %locs = {'southeast','southeast','southeast','southeast','southeast','southeast'};
+    %set_num = 5;
     
     %NNPCA
-    filenames = ["with_SQP_zz_NNPCA_Dim5.dat", "with_SQP_zz_NNPCA_Dim10.dat",...
-        "with_SQP_zz_NNPCA_Dim15.dat", "with_SQP_zz_NNPCA_Dim20.dat", ...
-       "with_SQP_zz_NNPCA_Dim25.dat","with_SQP_zz_NNPCA_Dim30.dat","with_SQP_zz_NNPCA_Dim50.dat"];
-    titlenames = ["Dimension 5", "Dimension 10", "Dimension 15",...
-        "Dimension 20", "Dimension 25", "Dimension 30", "Dimension 50"];
-    locs = {'southeast','southeast','southeast','southeast','southeast','southeast','southeast'};
-    set_num = 7;
+    %filenames = ["with_SQP_zz_NNPCA_Dim5.dat", "with_SQP_zz_NNPCA_Dim10.dat",...
+    %    "with_SQP_zz_NNPCA_Dim15.dat", "with_SQP_zz_NNPCA_Dim20.dat", ...
+    %   "with_SQP_zz_NNPCA_Dim25.dat","with_SQP_zz_NNPCA_Dim30.dat","with_SQP_zz_NNPCA_Dim50.dat"];
+    %titlenames = ["Dimension 5", "Dimension 10", "Dimension 15",...
+    %    "Dimension 20", "Dimension 25", "Dimension 30", "Dimension 50"];
+    %locs = {'southeast','southeast','southeast','southeast','southeast','southeast','southeast'};
+    %set_num = 7;
     
     
     startingsolver = [1 2 2 2 2 2 2];
@@ -49,9 +53,9 @@ function plotperfprof
             extable(extable == 0) = eps;
             [T(ii, :), ~,~,~] = timeplotprof(extable, ftol, constrtol);
         end
-        %subplot(2,2,plotnum);  % AO
-        %subplot(3,2,plotnum);  % BC
-        subplot(4,2,plotnum); %NNPCA
+        %subplot(4,4,plotnum);  % RCs
+        %subplot(3,2,plotnum);  % BC, AO
+        %subplot(4,2,plotnum); %NNPCA
         perf(T(:,startingsolver(plotnum):7), 1, plotnum);
     end
     

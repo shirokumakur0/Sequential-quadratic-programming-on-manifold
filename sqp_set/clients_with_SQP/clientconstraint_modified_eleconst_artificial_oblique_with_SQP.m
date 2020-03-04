@@ -1,4 +1,4 @@
-function data = clientconstraint_artificial_oblique_with_SQP(L, rankY, methodoptions, specifier, setting)
+function data = clientconstraint_modified_eleconst_artificial_oblique_with_SQP(L, rankY, methodoptions, specifier, setting)
 
 data = NaN(3,7);
 [N, ~] = size(L);
@@ -15,15 +15,21 @@ x0 = problem.M.rand();
 
 %-------------------------Set-up Constraints-----------------------
 colones = ones(N, 1);
+[xR,xC] = size(x0);
+eq_gradmat1 = [ones(1,xC); zeros(1,xC)];
+eq_gradmat2 = [zeros(1,xC); ones(1,xC)];
 
-eq_constraints_cost = cell(1,1);
-eq_constraints_cost{1} = @(U) norm(U*colones,2)^2;
+eq_constraints_cost = cell(1,2);
+eq_constraints_cost{1} = @(U) U(1,:) * colones;
+eq_constraints_cost{2} = @(U) U(2,:) * colones;
 
-eq_constraints_grad = cell(1,1);
-eq_constraints_grad{1} = @(U) meanzero_eq_constraint(U);
+eq_constraints_grad = cell(1,2);
+eq_constraints_grad{1} = @(U) eq_gradmat1;
+eq_constraints_grad{2} = @(U) eq_gradmat2;
 
-eq_constraints_hess = cell(1,1);
-eq_constraints_hess{1} = @(U, D) hess_meanzero_eq_constraint(U, D);
+eq_constraints_hess = cell(1,2);
+eq_constraints_hess{1} = @(U, D) zeros(xR, xC);
+eq_constraints_hess{2} = @(U, D) zeros(xR, xC);
 
 problem.eq_constraint_cost = eq_constraints_cost;
 problem.eq_constraint_grad = eq_constraints_grad;
@@ -32,19 +38,31 @@ problem.eq_constraint_hess = eq_constraints_hess;
 A = rand(N) * rand(N).';
 A = 0.5 * (A+A.');
 setting.A = A;
+r = rand(1);
 
-ineq_constraints_cost = cell(1,1);
-ineq_constraints_cost{1} = @(U) trace((U) * A * (U.')) - rand(1);
-ineq_constraints_grad = cell(1,1);
+bound = -5;
+
+ineq_constraints_cost = cell(1, 1 + xR * xC);
+ineq_constraints_cost{1} = @(U) trace((U) * A * (U.')) - r;
+ineq_constraints_grad = cell(1,1 + xR * xC);
 ineq_constraints_grad{1} = @(U) U*A + U*A.';
-ineq_constraints_hess = cell(1,1);
+ineq_constraints_hess = cell(1,1 + xR * xC);
 ineq_constraints_hess{1} = @(U, D) D*A + D*A.';
+
+for row = 1: xR
+    for col = 1: xC
+        ineq_constraints_cost{1 + (row - 1) *xC + col} = @(U) -U(row, col) + bound;
+        constraintgrad = zeros(xR, xC);
+        constraintgrad(row, col) = -1;
+        ineq_constraints_grad{1 + (row - 1) * xC + col} = @(U) constraintgrad;
+        ineq_constraints_hess{1 + (row - 1) * xC + col} = @(U, D) zeros(xR, xC);
+    end
+end
+
 
 problem.ineq_constraint_cost = ineq_constraints_cost;
 problem.ineq_constraint_grad = ineq_constraints_grad;
 problem.ineq_constraint_hess = ineq_constraints_hess;
-
-
 
 %     Debug Only
 %     checkconstraints_upto2ndorder(problem)
@@ -61,7 +79,7 @@ condet = constraintsdetail(problem);
         [xfinal, info] = exactpenaltyViaMinimax(problem, x0, options);
         time = toc(timetic);
         
-        filename = sprintf('AO_Mini-Sum-Max_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
+        filename = sprintf('EAO_Mini-Sum-Max_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
         struct2csv(info, filename);
 
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
@@ -77,7 +95,7 @@ condet = constraintsdetail(problem);
         timetic = tic();
         [xfinal, info] = almbddmultiplier(problem, x0, options);
         time = toc(timetic);
-        filename = sprintf('AO_ALM_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
+        filename = sprintf('EAO_ALM_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
         % info = rmfield(info, 'lambdas');
         % info = rmfield(info, 'gammas');
         struct2csv(info, filename);
@@ -96,7 +114,7 @@ condet = constraintsdetail(problem);
         [xfinal, info] = exactpenaltyViaSmoothinglqh(problem, x0, options);
         time = toc(timetic);
         
-        filename = sprintf('AO_LQH_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
+        filename = sprintf('EAO_LQH_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
         struct2csv(info, filename);
         
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
@@ -114,7 +132,7 @@ condet = constraintsdetail(problem);
         [xfinal, info] = exactpenaltyViaSmoothinglse(problem, x0, options);
         time = toc(timetic);
 
-        filename = sprintf('AO_LSE_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
+        filename = sprintf('EAO_LSE_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
         struct2csv(info, filename);
         
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
@@ -146,12 +164,12 @@ condet = constraintsdetail(problem);
         %history.maxviolation = [];
         %history.meanviolation = [];
         
-        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], [], [], @nonlcon, options);
+        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], bound * ones(rankY, N), [], @nonlcon, options);
         time = toc(timetic);
         
         history.iter(1,:) =[];
         history.cost(1,:) = [];
-        filename = sprintf('AO_fmincon_interior_point_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
+        filename = sprintf('EAO_fmincon_interior_point_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
         struct2csv(info, filename);      
         
         xfinal = reshape(xfinal, [rankY, N]);
@@ -182,12 +200,12 @@ condet = constraintsdetail(problem);
         %history.maxviolation = [];
         %history.meanviolation = [];
         
-        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], [], [], @nonlcon, options);
+        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], bound * ones(rankY, N), [], @nonlcon, options);
         time = toc(timetic);
         
         history.iter(1,:) =[];
         history.cost(1,:) = [];
-        filename = sprintf('AO_fmincon_SQP_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
+        filename = sprintf('EAO_fmincon_SQP_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
         struct2csv(info, filename);      
         
         xfinal = reshape(xfinal, [rankY, N]);
@@ -209,7 +227,7 @@ condet = constraintsdetail(problem);
         timetic = tic();
         [xfinal, costfinal, info, ~] = SQP(problem, x0, sqpoptions);
         time = toc(timetic);
-        filename = sprintf('AO_Riemannian_SQP_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
+        filename = sprintf('EAO_Riemannian_SQP_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
         struct2csv(info, filename);
         
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
@@ -219,7 +237,7 @@ condet = constraintsdetail(problem);
         data(3, 7) = time;
     end
     
-        filename = sprintf('AO_Info_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
+        filename = sprintf('EAO_Info_nrep%dDim%dDen%.3f.csv',setting.repeat,setting.dim, setting.density);
         struct2csv(setting, filename);
     
      %------------------------sub functions-----------
@@ -245,17 +263,25 @@ condet = constraintsdetail(problem);
 
     function [c, ceq, gradc, gradceq] = nonlcon(v)
         Y = reshape(v, [rankY, N]);
-        ceq = zeros(N+1,1);
+        ceq = zeros(N+rankY,1);
         for rowCeq = 1: N
             ceq(rowCeq,1) = Y(:,rowCeq).'*Y(:,rowCeq) - 1;
         end
-        ceq(N+1,1) = colones.' *(Y.')* Y * colones;
-        c = [];
+        for rowCeq = 1:rankY
+            ceq(N+rowCeq,1) = Y(rowCeq, :) * colones;
+        end
+        c = zeros(1,1);
+        c(1,1) = trace((Y) * A * (Y.')) - r;
+        
         if nargout > 2
-            gradc = [];
-            gradceq = zeros(rankY*N, N+1);
-            grad = 2* repmat(Y*colones, 1, N);
-            gradceq(:, N+1) = grad(:);
+            grad = Y*A + Y*A.';
+            gradc(1,1) = grad(:);
+            gradceq = zeros(rankY*N, N+rankY);
+            for rowCeq = 1:rankY
+                grad = zeros(rankY,N);
+                grad(rowCeq, :) = 1;
+                gradceq(:, N+rowCeq) = grad(:);
+            end
             for rowCeq = 1: N
                 grad = zeros(rankY, N);
                 grad(:, rowCeq) = 2*Y(:, rowCeq);

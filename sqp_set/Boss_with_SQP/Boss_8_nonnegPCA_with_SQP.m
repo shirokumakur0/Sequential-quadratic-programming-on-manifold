@@ -38,11 +38,12 @@ for repeat = 1: n_repeat
                 
 
                 %________Experiment_____
-                options.maxOuterIter = 5000;
+                options.maxOuterIter = 1000;
                 options.maxtime = 3600;
                 options.minstepsize = 1e-8;
                 options.mineigval_correction = 1e-12;
                 options.verbosity = 1;
+                options.tolviosum = 1e-50;
                 
                 %________Setting________
                 setting.repeat = repeat;

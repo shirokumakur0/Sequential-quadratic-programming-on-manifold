@@ -11,6 +11,9 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
     localdefaults.thetarho = 0.3;
     localdefaults.maxOuterIter = 300;
     localdefaults.numOuterItertgn = 30;
+    localdefaults.outerverbosity = 1;  % verbosity for outer loops by MO
+    localdefaults.tolKKTres = 1e-8; % A stopping criterion, added by MO
+    localdefaults.minstepsize = 1e-10;  % added by MO
     %Inner Loop Setting
     localdefaults.maxInnerIter = 200;
     localdefaults.startingtolgradnorm = 1e-3;
@@ -27,14 +30,19 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
     
     lambdas = options.lambdas;
     gammas = options.gammas;
-    oldlambdas = lambdas;  % MO
-    oldgammas = gammas;  % MO
     rho = options.rho;
     oldacc = Inf;
     M = problem0.M;
     xCur = x0;
     xPrev = xCur;
     OuterIter = 0;
+    
+    % for savestats, by MO
+    gradLagfun = @(X) gradLag(X, problem0, lambdas, gammas);
+    xCurLagGrad = gradLagfun(xCur);
+    xCurLagGradNorm = problem0.M.norm(xCur, xCurLagGrad);
+    xCurMaxLagMult = maxabsLagrangemultipliers(lambdas, gammas);
+    xCurResidual = KKT_residual();
     
     stats = savestats(x0);
     info(1) = stats;
@@ -57,11 +65,11 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
         inneroptions.maxiter = options.maxInnerIter;
         inneroptions.minstepsize = options.minstepsize;
         
-        % For violation_sum (MO)
-        oldlambdas = lambdas;
-        oldgammas = gammas;
          
         [xCur, cost, innerinfo, Oldinneroptions] = rlbfgs(problem, xCur, inneroptions);
+        
+        % For KKT Residual, by MO
+        gradLagfun = @(X) gradLag(X, problem0, lambdas, gammas);
         
         %Update Multipliers
         newacc = 0;
@@ -85,22 +93,70 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
         oldacc = newacc;
         tolgradnorm = max(options.endingtolgradnorm, tolgradnorm * thetatolgradnorm);
         
+        % For savestats, by MO
+        xCurLagGrad = gradLagfun(xCur);
+        xCurLagGradNorm = problem0.M.norm(xCur, xCurLagGrad);
+        xCurMaxLagMult = maxabsLagrangemultipliers(lambdas, gammas);
+        xCurResidual = KKT_residual();
+        
+        % calculating the distance for savestats, by MO
+        if contains(problem0.M.name(),'Stiefel') 
+            dist = norm(xCur - xPrev, 'fro');
+        elseif contains(problem0.M.name(),'rank')
+            % Only assuming for 'fixedrankembeddedfactory'
+            if ~exist('xCurmat', 'var')
+                xCurmat = xCur.U * xCur.S * xCur.V';
+            end    
+            xPrevmat = xPrev.U * xPrev.S * xPrev.V';
+            dist = norm(xCurmat - xPrevmat, 'fro');
+            xCurmat = xPrevmat;
+        else
+            dist = problem0.M.dist(xCur, xPrev);
+        end
+        
         %Save stats
         stats = savestats(xCur);
         info(OuterIter+1) = stats;
-        if mod(OuterIter, 100) == 0 
-            fprintf('FroNormStepDiff: %.16e\n', norm(xPrev-xCur,'fro'))
+        
+        % verbosity modified by MO on March 2
+        if options.outerverbosity >= 2
+            fprintf('KKT Residual: %.16e\n', xCurResidual)
+        elseif options.verbosity == 1 && mod(OuterIter, 100) == 0 
+            fprintf('KKT Residual: %.16e\n', xCurResidual)
         end
-        if norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
+        
+        % This is the stopping criterion based on violation_sum by MO on
+        % March 4.
+        if xCurResidual < options.tolKKTres && tolgradnorm <= options.endingtolgradnorm
             break;
         end
+        
+        % The following part is as for a stopping criterion based on norm
+        % by MO, March 2, 
+        % if contains(problem0.M.name(),'rank')  % Only assuming for 'fixedrankembeddedfactory'.
+        %     if ~exist('xPrevMat', 'var')
+        %         xPrevMat = xPrev.U * xPrev.S * xPrev.V';
+        %     end
+        %     xCurMat = xCur.U * xCur.S * xCur.V';
+        %     if norm(xPrevMat - xCurMat, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
+        %         break;
+        %     end
+        %     xPrevMat = xCurMat;
+        % elseif norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
+        %     break;
+        % end
+        
+        % The original one, remained here, just in case
+        % if norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
+        %     break;
+        % end
+        
         if toc(totaltime) > options.maxtime
             break;
         end
         
         xPrev = xCur;
     end
-   
     info = info(1: OuterIter+1);
 
     xfinal = xCur;
@@ -109,17 +165,19 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
         stats.iter = OuterIter;
         if stats.iter == 0
             stats.time = 0;
+            stats.dist = NaN; % by MO
         else
             stats.time = info(OuterIter).time + toc(timetic);
+            stats.dist = dist;
         end
         [maxviolation, meanviolation, costCur] = evaluation(problem0, x, condet);
         stats.maxviolation = maxviolation;
         stats.meanviolation = meanviolation;
         stats.cost = costCur;
-        % addding the information on Lagrange multipliers for sqp (MO)
-        stats.lambdas = lambdas;
-        stats.gammas = gammas;
-        stats.violation_sum = violation_sum(); % (MO)
+        % addding the information on Lagrange multipliers for sqp (by MO)
+        stats.maxabsLagMult = xCurMaxLagMult;  % added by MO
+        stats.KKT_residual = xCurResidual;  % added by MO
+        stats.LagGradNorm = xCurLagGradNorm;
     end
     
     function val = cost_alm(x, problem, rho, lambdas, gammas)
@@ -169,36 +227,61 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
     end
 
     % For additiobal stats (MO)
-     function val = violation_sum()
-        val = 0;
-        xGrad = getGradient(problem0, xCur);
+     function val = KKT_residual()
+        xGrad = gradLagfun(xCur);
+        val = (problem0.M.norm(xCur, xGrad))^2;
         if condet.has_ineq_cost
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem0.ineq_constraint_cost{numineq};
                 cost_at_x = costhandle(xCur);
                 violation = max(0, cost_at_x);
-                val = val + violation^2;
-                
-                gradhandle = problem0.ineq_constraint_grad{numineq};
-                grad_at_x = gradhandle(xCur);
-                xGrad = xGrad + oldlambdas(numineq) * grad_at_x;
+                val = val + (violation)^2;
             end
         end
         if condet.has_eq_cost
             for numeq = 1: condet.n_eq_constraint_cost
                 costhandle = problem0.eq_constraint_cost{numeq};
                 cost_at_x = abs(costhandle(xCur));
-                val = val + cost_at_x^2;
-                
-                gradhandle = problem0.eq_constraint_grad{numeq};
-                grad_at_x = gradhandle(xCur);
-                xGrad = xGrad + oldgammas(numeq) * grad_at_x; 
+                val = val + (cost_at_x)^2;                
             end
         end
-        val = val + problem0.M.norm(xCur, xGrad)^2;
         val = sqrt(val);
         %stats.violation_sum = val;
      end
+ 
+    function val = maxabsLagrangemultipliers(lambdas, gammas)
+       val = -1; % meaning no constraints
+       if condet.has_ineq_cost
+            for numineq = 1: condet.n_ineq_constraint_cost
+                val = max(val, abs(lambdas(numineq)));
+            end
+        end
+        
+        if condet.has_eq_cost
+            for numeq = 1:condet.n_eq_constraint_cost
+                val = max(val, abs(gammas(numeq)) );
+            end
+        end
+    end
+ 
+    function val = gradLag(x, problem0, lambdas, gammas)
+        val = getGradient(problem0, x);
+        if condet.has_ineq_cost
+            for numineq = 1: condet.n_ineq_constraint_cost
+                gradhandle = problem0.ineq_constraint_grad{numineq};
+                constraint_grad = gradhandle(x);
+                constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
+                val = problem0.M.lincomb(x, 1, val, lambdas(numineq), constraint_grad);
+            end
+        end
+
+        if condet.has_eq_cost
+            for numeq = 1:condet.n_eq_constraint_cost
+                gradhandle = problem0.eq_constraint_grad{numeq};
+                constraint_grad = gradhandle(x);
+                constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
+                val = problem0.M.lincomb(x, 1, val, gammas(numeq), constraint_grad);
+            end
+        end
+    end
 end
-
-

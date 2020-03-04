@@ -1,15 +1,31 @@
-function data = clientconstraint_geodesically_convex_programming_with_SQP(X, rankY, methodoptions, specifier, setting)
-%Y is a square matrix
-%rank is smaller than columns of Y
+function data = clientconstraint_geodesically_convex_programming_with_SQP(n, m, methodoptions, specifier, setting)
+%n: dimension
+%m: size (the number of matrices)
+%K: max iterations
 [N, ~] = size(X);
 
 data = NaN(3, 7);
 
+%% Generate collection of PSD
+A=genPosdef(n,m);  % A: cells data, whose number of m, each of which has a n*n sym. mat. 
+cond_no = cond_numbers(A);
+
+% generate weights
+w=rand(1,m);
+s=sum(w);
+w=w./s;
+
+% means
+am=arithmeticMean(A);
+[hm Ai] =harmonicMean(A);
+
 M = sympositivedefinitefactory_mod(n);
 problem.M = M;
 
-
-
+% initialization
+means{1}=am;
+means{2}=hm;
+x0 = hm;
 
 %% already imported the cadidate functions of cost grad and hess?
  % firstly, check the validity of them!
@@ -20,8 +36,8 @@ problem.ehess = @(u, d) hessfun(u, d);
 x0 = M.rand();
 
 %     DEBUG only
-%     checkgradient(problem);
-%     checkhessian(problem); % almost OK
+     checkgradient(problem);
+     checkhessian(problem); 
 
 %-------------------------Set-up Constraints-----------------------
 constraints_cost = cell(1, N*rankY);
@@ -83,8 +99,8 @@ condet = constraintsdetail(problem);
         [xfinal, info] = almbddmultiplier(problem, x0, options);
         time = toc(timetic);
         filename = sprintf('NNPCA_ALM_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
-        info = rmfield(info,'lambdas');
-        info = rmfield(info,'gammas');
+        % info = rmfield(info,'lambdas');
+        % info = rmfield(info,'gammas');
         struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
@@ -253,45 +269,30 @@ condet = constraintsdetail(problem);
         end
     end
 
-    function [output, x] = costfun(x, A)  % cost function
-    k = length(A.invh);
-    output = 0;
-    if(sum(find(isinf(x.U))))
-        output = inf;
-        return;
+    function f = costfun(x, A)  % cost function
+      if ~isposdef(A)
+        f = Inf;
+      else
+        f = gmobj(x,A);
+      end
     end
 
-    for i = 1 : k
-        S = A.invh{i} * x.L;
-        [V, D] = schur(S * S');
-        x.log{i} = V * diag(log(diag(D))) * V';
-        x.c(i) = D(end,end)/D(1,1);
-        output = output + norm(x.log{i}, 'fro')^2;
-    end
-    output = output / (2 * k);
-    end
-
-
-    function [output, x] = gradfun(x, A) % gradient of f(x)
-    k = length(A.invh);
-    if(~isfield(x, 'log'))
-        for i = 1:k
-            S = A.invh{i} * x.L;
-            [V, D] = schur(S * S');
-            x.log{i} = V * diag(log(diag(D))) * V';
-            x.c(i) = D(end,end)/D(1,1);
-        end
-    end
-    output.TV = zeros(size(x.U));
-    for i = 1 : k
-        output.TV = output.TV + x.U * A.invh{i} * x.log{i} * A.h{i};
-    end
-    output.TV = 0.5 * (output.TV + output.TV');
-    output.TV = output.TV/k;
-    output = vech_pd(x, output);
+    function g = egradfun(x, A) % gradient of f(x)
+      if ~isposdef(A)
+          g  = Inf(size(x));
+          %gf = Inf(size(x));
+      else
+          g = zeros(size(x));
+          for i=1:numel(A)
+            g = g + logm(A{i}\x);
+          end
+          g=2*g/x;
+          g=(g+g')/2;
+          %gf = problem.M.egrad2rgrad(x, g);
+      end
     end
 
-    function output = hessfun(x, v, A)
+    function output = hessfun(x, v, A) % TODO CONSIDER THE VALIDITY
     k = length(A.inv);
     output.TV = zeros(size(x.U));
     fv = full_pd(x, v);
