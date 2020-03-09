@@ -11,7 +11,7 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
     localdefaults.endingepsilon = 1e-6;
     localdefaults.outerverbosity = 1;  % verbosity for outer loops by MO
     localdefaults.tolKKTres = 1e-8; % a stopping criterion, added by MO
-    localdefaults.minstepsize = 1e-10;  % added by MO
+    localdefaults.minstepsize = 1e-8;  % added by MO
     %Inner Loop Setting
     localdefaults.maxInnerIter = 200;
     localdefaults.startingtolgradnorm = 1e-3;
@@ -51,7 +51,7 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
         % verbosity modified by MO
         if options.outerverbosity >= 2
             fprintf('Iteration: %d    ', OuterIter);
-        elseif options.verbosity == 1 && mod(OuterIter, 100) == 0 
+        elseif options.outerverbosity == 1 && mod(OuterIter, 100) == 0 
             fprintf('Iteration: %d    ', OuterIter);
         end
         
@@ -91,25 +91,35 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
         stats = savestats(xCur);
         info(OuterIter+1) = stats;
         
-        if stats.maxviolation > epsilon
-            rho = rho/options.thetarho;
-        end
+        % According to the convergence theory. Liu and Boumal, 2019
+        %if stats.maxviolation > epsilon
+        %    rho = rho/options.thetarho;
+        %end
+        
+        % updating judge for exit, added by MO
+        oldeps = epsilon;
+        oldtolgradnorm = tolgradnorm;
         
         epsilon  = max(options.endingepsilon, theta_epsilon * epsilon);
         tolgradnorm = max(options.endingtolgradnorm, tolgradnorm * thetatolgradnorm);
-        
+                
         % verbosity modified by MO on March 2
         if options.outerverbosity >= 2
             fprintf('KKT Residual: %.16e\n', xCurResidual)
-        elseif options.verbosity == 1 && mod(OuterIter, 100) == 0 
+        elseif options.outerverbosity == 1 && mod(OuterIter, 100) == 0 
             fprintf('KKT Residual: %.16e\n', xCurResidual)
         end
         
         % This is the stopping criterion based on violation_sum by MO on
         % March 4.
         if xCurResidual < options.tolKKTres && tolgradnorm <= options.endingtolgradnorm
+            fprintf("KKT residual tolerance reached\n")            
             break;
+        elseif dist == 0 && (epsilon == oldeps) && (tolgradnorm == oldtolgradnorm)
+            fprintf("Any parameter did not change\n")            
+            break; % because nothing changed, meaning that the alg. keeps producing the same point hereafter.
         end
+        
         % The following part (norm based judging) is modifiied by MO,
         % March 2
         % if contains(problem0.M.name(),'rank')  % Only assuming for 'fixedrankembeddedfactory'.
@@ -213,7 +223,9 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
     % Added by MO
     function val = KKT_residual()
         grad = gradLag(xCur, problem0, epsilon);
+        manvio = manifoldViolation(xCur);
         val = problem0.M.norm(xCur, grad)^2;
+        val = val + manvio^2;
         if condet.has_ineq_cost
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem0.ineq_constraint_cost{numineq};
@@ -239,11 +251,13 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem.ineq_constraint_cost{numineq};            
                 cost_at_x = costhandle(x);
-                gradhandle = problem.ineq_constraint_grad{numineq};
-                constraint_grad = gradhandle(x);
-                constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-                lambda = 1 / ( 1 + exp(- cost_at_x / u) );
-                val = problem.M.lincomb(x, 1, val, lambda, constraint_grad);
+                if abs(cost_at_x) <= options.tolKKTres  % the threshold should be lower than tolKKTres because the violation should be lower than it.
+                    gradhandle = problem.ineq_constraint_grad{numineq};
+                    constraint_grad = gradhandle(x);
+                    constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
+                    lambda = 1 / ( 1 + exp(- cost_at_x / u) );
+                    val = problem.M.lincomb(x, 1, val, rho * lambda, constraint_grad);
+                end
             end
         end
         if condet.has_eq_cost
@@ -256,7 +270,7 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
                 exp_plus = exp(cost_at_x / u);
                 exp_minus = exp(-cost_at_x / u);
                 gamma = (exp_plus - exp_minus) / (exp_plus + exp_minus);
-                val = problem.M.lincomb(x, 1, val, gamma, constraint_grad);
+                val = problem.M.lincomb(x, 1, val, rho * gamma, constraint_grad);
             end 
         end
     end
@@ -281,6 +295,22 @@ function [xfinal,info] = exactpenaltyViaSmoothinglse (problem0, x0, options)
                 gamma = (exp_plus - exp_minus) / (exp_plus + exp_minus);
                 val = max(val, abs(gamma));
             end 
+        end
+    end
+
+    % added by MO, for calculating KKT residual
+    function manvio = manifoldViolation(xCur)
+        % According to the type of manifold, calculate the violation from
+        % constraints seen as the manifold.
+        if contains(problem0.M.name(),'Sphere')         
+            y = xCur(:);
+            manvio = abs(y.'*y - 1);
+        elseif contains(problem0.M.name(),'Oblique')
+            [~,N] = size(xCur);
+            colones = ones(N, 1);
+            manvio = max(abs(diag(xCur.'*xCur)-colones));
+        else % including fixed-rank manifolds
+            manvio = 0;
         end
     end
 end

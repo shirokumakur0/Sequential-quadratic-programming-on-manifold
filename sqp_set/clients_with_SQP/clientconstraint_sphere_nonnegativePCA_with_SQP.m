@@ -3,7 +3,7 @@ function data = clientconstraint_sphere_nonnegativePCA_with_SQP(X, rankY, method
 %rank is smaller than columns of Y
 [N, ~] = size(X);
 
-data = NaN(3, 7);
+data = NaN(3, 6);
 
 M = spherefactory(N, rankY);
 problem.M = M;
@@ -45,6 +45,7 @@ end
 problem.ineq_constraint_cost = constraints_cost;
 problem.ineq_constraint_grad = constraints_grad;
 problem.ineq_constraint_hess = constraints_hess;
+
 %     Debug Only
 %     checkconstraints_upto2ndorder(problem) % Okay!
 
@@ -54,46 +55,44 @@ condet = constraintsdetail(problem);
     options = methodoptions;
         
     if specifier.ind(1)
-        %MINI-SUM-MAX
-        fprintf('Starting Mini-sum-max \n');
+        %ALM
+        fprintf('Starting ALM \n');
         timetic = tic();
-        [xfinal, info] = exactpenaltyViaMinimax(problem, x0, options);
+        [xfinal, info] = almbddmultiplier(problem, x0, options);
         time = toc(timetic);
-        filename = sprintf('NNPCA_Mini-Sum-Max_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
-        struct2csv(info, filename);
-
+        filename = sprintf('NNPCA_ALM_nrep%dDim%dSNR%.2fDel%.2fTol%d.csv',setting.repeat,setting.dim, setting.snr,setting.delta, setting.tolKKTres);
+        struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
         data(1, 1) = maxviolation;
         data(2, 1) = cost;
         data(3, 1) = time;
     end
-    
+
     if specifier.ind(2)
-        %ALM
-        fprintf('Starting ALM \n');
+        %LQH
+        fprintf('Starting LQH \n');
         timetic = tic();
-        [xfinal, info] = almbddmultiplier(problem, x0, options);
+        [xfinal, info] = exactpenaltyViaSmoothinglqh(problem, x0, options);
         time = toc(timetic);
-        filename = sprintf('NNPCA_ALM_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
-        % info = rmfield(info,'lambdas');
-        % info = rmfield(info,'gammas');
-        struct2csv(info, filename);        
+        filename = sprintf('NNPCA_LQH_nrep%dDim%dSNR%.2fDel%.2fTol%d.csv',setting.repeat,setting.dim, setting.snr,setting.delta, setting.tolKKTres);
+        struct2csv(info, filename);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
         data(1, 2) = maxviolation;
         data(2, 2) = cost;
         data(3, 2) = time;
     end
-
+    
+    
     if specifier.ind(3)
-        %LQH
-        fprintf('Starting LQH \n');
+        %LSE
+        fprintf('Starting LSE \n');
         timetic = tic();
-        [xfinal, info] = exactpenaltyViaSmoothinglqh(problem, x0, options);
+        [xfinal, info] = exactpenaltyViaSmoothinglse(problem, x0, options);
         time = toc(timetic);
-        filename = sprintf('NNPCA_LQH_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
-        struct2csv(info, filename);
+        filename = sprintf('NNPCA_LSE_nrep%dDim%dSNR%.2fDel%.2fTol%d.csv',setting.repeat,setting.dim, setting.snr,setting.delta, setting.tolKKTres);
+        struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
         data(1, 3) = maxviolation;
@@ -101,129 +100,146 @@ condet = constraintsdetail(problem);
         data(3, 3) = time;
     end
     
-    
     if specifier.ind(4)
-        %LSE
-        fprintf('Starting LSE \n');
-        timetic = tic();
-        [xfinal, info] = exactpenaltyViaSmoothinglse(problem, x0, options);
-        time = toc(timetic);
-        filename = sprintf('NNPCA_LSE_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
-        struct2csv(info, filename);        
-        [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        maxviolation = max(maxviolation, manifoldViolation(xfinal));
-        data(1, 4) = maxviolation;
-        data(2, 4) = cost;
-        data(3, 4) = time;
-    end
-    
-    if specifier.ind(5)
         %FMINCON Interior point method
         fprintf('Starting fmincon_interior_point \n');
-        maxiter = methodoptions.maxOuterIter;    
+        maxiter = methodoptions.maxOuterIter;
+        maxFuniter = 1e+50;
+        fmincontolerance = 0;  % disabling that stopping condition.
         if specifier.matlabversion == 0
             % Use this if you are at 2015a or older.
-            options = optimoptions('fmincon', 'Algorithm','interior-point','MaxIter', maxiter, 'MaxFunEvals', maxiter,...
+            fminconoptions = optimoptions('fmincon', 'Algorithm','interior-point','MaxIter', maxiter, 'MaxFunEvals', maxFuniter,...
                 'GradObj', 'on', 'GradConstr', 'on', 'OutputFcn', @outfun,...
-                'TolX', methodoptions.minstepsize);
+                'TolX', fmincontolerance, 'TolCon', fmincontolerance, 'TolFun', fmincontolerance);
         else
             % Use this otherwise
-            options = optimoptions('fmincon','Algorithm','interior-point', 'MaxIterations', maxiter, 'MaxFunctionEvaluations', maxiter,...
+            fminconoptions = optimoptions('fmincon','Algorithm','interior-point', 'MaxIterations', maxiter, 'MaxFunctionEvaluations', maxFuniter,...
                 'SpecifyObjectiveGradient', true, 'SpecifyConstraintGradient', true, 'OutputFcn', @outfun,...
-                'StepTolerance', methodoptions.minstepsize);
+                'StepTolerance', fmincontolerance, 'ConstraintTolerance', fmincontolerance, 'OptimalityTolerance', fmincontolerance);
         end
         timetic = tic();
         history = struct();
         history.iter = [];
         history.cost = [];
-        %history.maxviolation = [];
-        %history.meanviolation = [];
+        history.LagGradNorm = [];
+        history.maxviolation = [];
+        history.KKT_residual = [];
         
-        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], zeros(N*rankY, 1), [], @nonlcon, options);
+        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], zeros(N*rankY, 1), [], @nonlcon, fminconoptions);
         time = toc(timetic);
 
         history.iter(1,:) =[];
         history.cost(1,:) = [];
-        filename = sprintf('NNPCA_fmincon_interior_point_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
+        history.LagGradNorm(1,:) = [];
+        history.maxviolation(1,:) = [];
+        history.KKT_residual(1,:) = [];
+
+        filename = sprintf('NNPCA_fmincon_interior_point_nrep%dDim%dSNR%.2fDel%.2fTol%d.csv',setting.repeat,setting.dim, setting.snr,setting.delta, setting.tolKKTres);
         struct2csv(history, filename);              
 
+        xfinal = reshape(xfinal, [N, rankY]);
+        [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
+        data(1, 4) = output.constrviolation;
+        data(2, 4) = cost;
+        data(3, 4) = time;
+    end
+
+    if specifier.ind(5)
+        %FMINCON sequential qudratic programming
+        fprintf('Starting fmincon_SQP \n');
+        maxiter = methodoptions.maxOuterIter;
+        maxFuniter = 1e+50;        
+        fmincontolerance = 0;  % disabling the other stopping conditions.
+        if specifier.matlabversion == 0
+            % Use this if you are at 2015a or older.
+            fminconoptions = optimoptions('fmincon', 'Algorithm', 'sqp' ,'MaxIter', maxiter, 'MaxFunEvals', maxFuniter,...
+                'GradObj', 'on', 'GradConstr', 'on', 'OutputFcn', @outfun,...
+                'TolX', fmincontolerance, 'TolCon', fmincontolerance, 'TolFun', fmincontolerance);
+        else
+            % Use this otherwise
+            fminconoptions = optimoptions('fmincon', 'Algorithm', 'sqp', 'MaxIterations', maxiter, 'MaxFunctionEvaluations', maxFuniter,...
+                'SpecifyObjectiveGradient', true, 'SpecifyConstraintGradient', true, 'OutputFcn', @outfun,...
+                'StepTolerance', fmincontolerance, 'ConstraintTolerance', fmincontolerance, 'OptimalityTolerance', fmincontolerance);
+        end
+        timetic = tic();
+        history = struct();
+        history.iter = [];
+        history.cost = [];
+        history.LagGradNorm = [];
+        history.maxviolation = [];
+        history.KKT_residual = [];
+        
+        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], zeros(N*rankY, 1), [], @nonlcon, fminconoptions);
+        time = toc(timetic);
+        history.iter(1,:) =[];
+        history.cost(1,:) = [];
+        history.LagGradNorm(1,:) = [];
+        history.maxviolation(1,:) = [];
+        history.KKT_residual(1,:) = [];
+        
+        filename = sprintf('NNPCA_fmincon_SQP_nrep%dDim%dSNR%.2fDel%.2fTol%d.csv',setting.repeat,setting.dim, setting.snr,setting.delta, setting.tolKKTres);
+        struct2csv(history, filename);              
         xfinal = reshape(xfinal, [N, rankY]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         data(1, 5) = output.constrviolation;
         data(2, 5) = cost;
         data(3, 5) = time;
     end
-
+    
     if specifier.ind(6)
-        %FMINCON sequential qudratic programming
-        fprintf('Starting fmincon_interior_point \n');
-        maxiter = methodoptions.maxOuterIter;    
-        if specifier.matlabversion == 0
-            % Use this if you are at 2015a or older.
-            options = optimoptions('fmincon', 'Algorithm', 'sqp' ,'MaxIter', maxiter, 'MaxFunEvals', maxiter,...
-                'GradObj', 'on', 'GradConstr', 'on', 'OutputFcn', @outfun,...
-                'TolX', methodoptions.minstepsize);
-        else
-            % Use this otherwise
-            options = optimoptions('fmincon', 'Algorithm', 'sqp', 'MaxIterations', maxiter, 'MaxFunctionEvaluations', maxiter,...
-                'SpecifyObjectiveGradient', true, 'SpecifyConstraintGradient', true, 'OutputFcn', @outfun,...
-                'StepTolerance', methodoptions.minstepsize);
-        end
+        % Riemannian SQP
+        fprintf('Starting Riemannian SQP \n');
         timetic = tic();
-        history = struct();
-        history.iter = [];
-        history.cost = [];
-        %history.maxviolation = [];
-        %history.meanviolation = [];
-        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], zeros(N*rankY, 1), [], @nonlcon, options);
+        [xfinal, costfinal, info,~] = SQP(problem, x0, options);
         time = toc(timetic);
-        history.iter(1,:) =[];
-        history.cost(1,:) = [];
-        filename = sprintf('NNPCA_fmincon_SQP_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
-        struct2csv(history, filename);              
-        xfinal = reshape(xfinal, [N, rankY]);
+        filename = sprintf('NNPCA_Riemannian_SQP_nrep%dDim%dSNR%.2fDel%.2fTol%d.csv',setting.repeat,setting.dim, setting.snr,setting.delta, setting.tolKKTres);
+        struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        data(1, 6) = output.constrviolation;
+        maxviolation = max(maxviolation, manifoldViolation(xfinal));
+        data(1, 6) = maxviolation;
         data(2, 6) = cost;
         data(3, 6) = time;
     end
     
-    if specifier.ind(7)
-        % Riemannian SQP
-        fprintf('Starting Riemannian SQP \n');
-        sqpoptions.maxtime = methodoptions.maxtime;
-        sqpoptions.maxiter = methodoptions.maxOuterIter;
-        sqpoptions.tolqpnorm = methodoptions.minstepsize;
-        sqpoptions.tolgradnorm = methodoptions.minstepsize;
-        sqpoptions.toliterdist = methodoptions.minstepsize;
-        sqpoptions.verbosity = methodoptions.verbosity;
-        sqpoptions.mineigval_correction = methodoptions.mineigval_correction;
-
-        timetic = tic();
-        [xfinal, costfinal, info,~] = SQP(problem, x0, sqpoptions);
-        time = toc(timetic);
-        filename = sprintf('NNPCA_Riemannian_SQP_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
-        struct2csv(info, filename);        
-        [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        maxviolation = max(maxviolation, manifoldViolation(xfinal));
-        data(1, 7) = maxviolation;
-        data(2, 7) = cost;
-        data(3, 7) = time;
-    end
-    
-    filename = sprintf('NNPCA_Info_nrep%dDim%dSNR%.2fDel%.2f.csv',setting.repeat,setting.dim, setting.snr,setting.delta);
+        filename = sprintf('NNPCA_Info_nrep%dDim%dSNR%.2fDel%.2fTol%d.csv',setting.repeat,setting.dim, setting.snr,setting.delta, setting.tolKKTres);
     struct2csv(setting, filename);
     
 %------------------------sub functions-----------     
      
      function stop = outfun(x, optimValues, state)
+        KKT_residual = optimValues.firstorderopt^2;
+
+        [xCurc, xCurceq, ~, ~] = nonlcon(x);
+        
+        [cnum, ~] = size(xCurc);
+        
+        for indexc = 1:cnum
+            cost_at_x = max(0, xCurc(indexc));
+            KKT_residual = KKT_residual + cost_at_x^2;
+        end
+        
+        [ceqnum, ~] = size(xCurceq);
+        
+        for indexceq = 1:ceqnum
+            KKT_residual = KKT_residual + (xCurceq(indexceq))^2;
+        end
+        
+        KKT_residual = sqrt(KKT_residual);
+        
         stop = false;
         if toc(timetic) > methodoptions.maxtime
+            fprintf("Time limit exceeded\n")
+            stop = true;
+        elseif KKT_residual < methodoptions.tolKKTres
+            fprintf("KKT residual tolerance reached\n")
             stop = true;
         end
+        
         history.iter = [history.iter; optimValues.iteration];
         history.cost = [history.cost;optimValues.fval];
-        %[history.maxviolation, history.meanviolation, cost] = evaluation(problem, x, condet);
+        history.LagGradNorm = [history.LagGradNorm; optimValues.firstorderopt];
+        history.maxviolation = [history.maxviolation; optimValues.constrviolation];
+        history.KKT_residual = [history.KKT_residual; KKT_residual];
     end 
      
      
@@ -257,7 +273,6 @@ condet = constraintsdetail(problem);
     function val = hessfun(Y, U)
         val = -X.'*U/2 - X*U/2;
     end
-
 
     function manvio = manifoldViolation(x)
         %Sphere Factory:

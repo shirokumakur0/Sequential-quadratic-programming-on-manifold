@@ -4,14 +4,13 @@
 close all; clc; clear all;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
-dim_set = [5, 10, 15, 20, 25, 30, 50];
-%dim_set = [10, 50, 100, 150, 250, 500, 1000];  % Dimension of "the Cov Matrix"
-%snrset = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0]; % Signal Strength
-%deltaset = [0.1, 0.3, 0.7, 0.9];           % Sparsity 
-
-snrset = [0.1, 0.25, 0.5, 1.0];
-deltaset = [0.3, 0.7, 0.9];   
-
+dim_set = [10, 25, 50, 75, 100];
+%dim_set = [10, 50, 100, 150, 250, 500, 1000]; % Dimension of "the Cov Matrix"
+%snrset = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0]; % Signal Strength (original)
+%deltaset = [0.1, 0.3, 0.7, 0.9];           % Sparsity (original)
+snrset = [0.25, 0.5, 1.0];  % Signal Strength
+deltaset = [0.3, 0.7];  % Sparsity 
+tolKKTrespowerset = [2, 4, 6, 8, 10, 12, 13, 14]; % 1e-* tolerance
 rank = 1;                                  % Rank of BM Relaxation. 1 if we don't.
 n_repeat = 1;                              % Number of repeat experiment
 
@@ -22,57 +21,54 @@ for repeat = 1: n_repeat
         for snr = snrset
             
             for delta = deltaset
+                
+                for tolKKTres = tolKKTrespowerset
 
-                %_______Set up data______
-                T = dim;
-                samplesize = floor(delta*dim);
-                S = randsample(dim, samplesize);
-                v = zeros(dim,1);
-                v(S) = 1/sqrt(samplesize);
-                X = sqrt(snr) * v * (v.');
-                Z = randn(dim)/sqrt(T);
-                for ii = 1: dim
-                    Z(ii,ii) = randn * 2/sqrt(T);
+                    %_______Set up data______
+                    T = dim;
+                    samplesize = floor(delta*dim);
+                    S = randsample(dim, samplesize);
+                    v = zeros(dim,1);
+                    v(S) = 1/sqrt(samplesize);
+                    X = sqrt(snr) * v * (v.');
+                    Z = randn(dim)/sqrt(T);
+                    for ii = 1: dim
+                        Z(ii,ii) = randn * 2/sqrt(T);
+                    end
+                    X = X+Z;
+
+                    %________Experiment_____
+                    options.maxOuterIter = 10000; % for Riemannian methods & fmincon
+                    options.maxiter = options.maxOuterIter;  % for RSQP
+                    options.maxtime = 180;
+                    options.tolKKTres = 10^(-tolKKTres);
+                    options.outerverbosity = 1;
+                    options.verbosity = options.outerverbosity;
+                    %________Setting________
+                    setting.repeat = repeat;
+                    setting.dim = dim;
+                    setting.snr = snr;
+                    setting.delta = delta;
+                    setting.rank = rank;
+                    setting.tolKKTres = tolKKTres;
+                    setting.maxOuterIter = options.maxOuterIter;
+                    setting.maxtime = options.maxtime;
+                    setting.Z = Z;
+
+                    specifier.ind = [1, 1, 1, 1, 1, 1];
+
+                    result = clientconstraint_sphere_nonnegativePCA_with_SQP(X, rank, options, specifier, setting);
+                    result = result(:);
+                    param = [dim; snr; delta; repeat; tolKKTres];
+                    outputdata = [result; param]';
+
+                    % PP according to dimension and tolKKTres
+                    filename = sprintf('with_SQP_zz_NNPCA_Dim%dTol%d.dat', dim, tolKKTres);
+                    dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
+                    % PP according to tolKKTres
+                    %filename = sprintf('with_SQP_zz_NNPCA_Tol%d.dat', tolKKTres);
+                    %dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
                 end
-                X = X+Z;
-                
-
-                %________Experiment_____
-                options.maxOuterIter = 1000;
-                options.maxtime = 3600;
-                options.minstepsize = 1e-8;
-                options.mineigval_correction = 1e-12;
-                options.verbosity = 1;
-                options.tolviosum = 1e-50;
-                
-                %________Setting________
-                setting.repeat = repeat;
-                setting.dim = dim;
-                setting.snr = snr;
-                setting.delta = delta;
-                setting.rank = rank;
-                setting.mineigval_correction = options.mineigval_correction;
-                setting.maxOuterIter = options.maxOuterIter;
-                setting.maxtime = options.maxtime;
-                setting.minstepsize = options.minstepsize;
-                setting.verbosity = options.verbosity;
-                setting.Z = Z;
-                
-                %Only do mini-sum-max for low dimensional data
-                if dim == dim_set(1)
-                    specifier.ind = ones(7,1);
-                else
-                    specifier.ind = [0, 1, 1, 1, 1, 1, 1];
-                end
-                %specifier.ind = [0, 0, 0, 0, 0, 0, 1];
-
-                result = clientconstraint_sphere_nonnegativePCA_with_SQP(X, rank, options, specifier, setting);
-                result = result(:);
-                param = [dim; snr; delta; repeat];
-                outputdata = [result; param]';
-                
-                filename = sprintf('with_SQP_zz_NNPCA_Dim%d.dat', dim);
-                dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
             end
         end
     end

@@ -3,7 +3,7 @@ function plotperfprof
 
     
     ftol = 1.02; % the tolerance ratio of function value
-    constrtol = 5e-4; % Max violation of constraint.
+    constrtol = 1e-9; % Max violation of constraint.
 
 
     
@@ -17,25 +17,25 @@ function plotperfprof
     %set_num = 5;
     
     % BC
-    %filenames = ["with_SQP_zz_BC_Dim10.dat",...
-    %    "with_SQP_zz_BC_Dim15.dat", "with_SQP_zz_BC_Dim20.dat","with_SQP_zz_BC_Dim25.dat",...
-    %    "with_SQP_zz_BC_Dim30.dat"];
-    %titlenames = ["Dimension 10", "Dimension 15",...
-    %    "Dimension 20","Dimension 25","Dimension 30"];
-    %locs = {'southeast','southeast','southeast','southeast','southeast','southeast'};
-    %set_num = 5;
+    filenames = ["with_SQP_zz_BC_Dim10.dat",...
+        "with_SQP_zz_BC_Dim20.dat","with_SQP_zz_BC_Dim25.dat",...
+        "with_SQP_zz_BC_Dim30.dat", "with_SQP_zz_BC_Dim50.dat"];
+    titlenames = ["Dimension 10", "Dimension 15",...
+        "Dimension 20","Dimension 25","Dimension 30", "Dimension 50"];
+    locs = {'southeast','southeast','southeast','southeast','southeast','southeast'};
+    set_num = 5;
     
     %NNPCA
-    %filenames = ["with_SQP_zz_NNPCA_Dim5.dat", "with_SQP_zz_NNPCA_Dim10.dat",...
-    %    "with_SQP_zz_NNPCA_Dim15.dat", "with_SQP_zz_NNPCA_Dim20.dat", ...
-    %   "with_SQP_zz_NNPCA_Dim25.dat","with_SQP_zz_NNPCA_Dim30.dat","with_SQP_zz_NNPCA_Dim50.dat"];
-    %titlenames = ["Dimension 5", "Dimension 10", "Dimension 15",...
-    %    "Dimension 20", "Dimension 25", "Dimension 30", "Dimension 50"];
+    %filenames = ["with_SQP_zz_NNPCA_Dim30.dat", "with_SQP_zz_NNPCA_Dim50.dat",...
+    %    "with_SQP_zz_NNPCA_Dim100.dat", "with_SQP_zz_NNPCA_Dim150.dat", "with_SQP_zz_NNPCA_Dim200.dat"] %, ...
+    %    %"with_SQP_zz_NNPCA_Dim25.dat","with_SQP_zz_NNPCA_Dim30.dat","with_SQP_zz_NNPCA_Dim50.dat"];
+    %titlenames = ["Dimension 30", "Dimension 50", "Dimension 100", "Dimension 150",...
+    %    "Dimension 200"]% , "Dimension 25", "Dimension 30", "Dimension 50"];
     %locs = {'southeast','southeast','southeast','southeast','southeast','southeast','southeast'};
-    %set_num = 7;
+    %set_num = 5;
     
     
-    startingsolver = [1 2 2 2 2 2 2];
+    startingsolver = [1 1 1 1 1 1];
     fig = figure;
     
     for plotnum = 1:set_num % 7 NNPCA % 6 BC, AO
@@ -45,18 +45,18 @@ function plotperfprof
         data = csvread(filename);
         [nrow, ~] = size(data);
 
-        T = zeros(nrow, 7);
+        T = zeros(nrow, 6);
         for ii = 1 : nrow
-            extable = data(ii, 1 : 21);
+            extable = data(ii, 1 : 18);
             extable = extable';
-            extable = reshape(extable, [3, 7]);
+            extable = reshape(extable, [3, 6]);
             extable(extable == 0) = eps;
             [T(ii, :), ~,~,~] = timeplotprof(extable, ftol, constrtol);
         end
         %subplot(4,4,plotnum);  % RCs
-        %subplot(3,2,plotnum);  % BC, AO
-        %subplot(4,2,plotnum); %NNPCA
-        perf(T(:,startingsolver(plotnum):7), 1, plotnum);
+        subplot(3,2,plotnum);  % BC, AO
+        %subplot(3,2,plotnum); %NNPCA
+        perf(T(:,startingsolver(plotnum):6), 1, plotnum);
     end
     
     
@@ -96,33 +96,33 @@ function plotperfprof
         
         disp(r)
         
-        if ns == 7
-            r = circshift(r, [0,-1]);
-        end
-        if ns == 7
-            for s = 1: ns
-                [xs, ys] = stairs(r(:,s), [1 : np]/np);
-                plot(xs, ys, 'LineStyle', lines{s});
-                hold on;
-            end
-        else
+        %if ns == 7
+        %    r = circshift(r, [0,-1]);
+        %end
+        %if ns == 7
+        %    for s = 1: ns
+        %        [xs, ys] = stairs(r(:,s), [1 : np]/np);
+        %        plot(xs, ys, 'LineStyle', lines{s});
+        %        hold on;
+        %    end
+        %else
             for s = 1: ns
                 [xs, ys] = stairs(r(:,s), [1 : np]/np);
                 plot(xs, ys, 'LineStyle', lines{s});
                 hold on;
             end            
-        end
+        %end
         
             
         axis([ -0.1 1*(max_ratio)+0.01 0 1 ]);
         %axis([ 0 2*(max_ratio)+0.01 0 1 ]);
         
         
-        if ns == 7
-            legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon_interior_point', 'fmincon_SQP','Riemannian SQP','REPMSD'},'Location',locs{plotnum},'Interpreter','latex');
-        else
+        %if ns == 7
+        %    legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon_interior_point', 'fmincon_SQP','Riemannian SQP','REPMSD'},'Location',locs{plotnum},'Interpreter','latex');
+        %else
             legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon_interior_point','fmincon_SQP','Riemannian SQP'},'Location',locs{plotnum},'Interpreter','latex');
-        end
+        %end
         ylabel('Performance Profile');
         xlabel('$$\log_2\tau$','Interpreter','latex');
         title(titlenames(plotnum));

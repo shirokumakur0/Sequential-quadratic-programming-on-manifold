@@ -66,26 +66,27 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     % Set localdefaults, a struct to be combined with argument options for
     % declaring hyperparameters.
     % For stopping criteria
-    localdefaults.maxiter = 5000;
+    localdefaults.maxiter = 300;
     localdefaults.maxtime = 3600;
-    localdefaults.tolKKTres = 1e-30;
+    localdefaults.tolKKTres = 1e-8;
     %localdefaults.tolgradnorm = 1e-8;
     %localdefaults.toliterdist = 1e-8;
     % For StoreDB
     % localdefaults.storedepth = 3;
     % For modification for the hessian matrix to be positive semidefinete.
     localdefaults.modify_hessian = 'mineigval_matlab';
-    localdefaults.mineigval_correction = 1e-7; % the param for mineigval_manopt or _matlab
+    localdefaults.mineigval_correction = 1e-8; % the param for mineigval_manopt or _matlab
     localdefaults.mineigval_threshold = 1e-3;
     % Initial parameters for the merit function and the Lagrangian
     localdefaults.tau = 0.5;  % as long as tau > 0
     localdefaults.rho = 1;  % as long as rho > 0
-    localdefaults.beta = 0.95;  % as long as 1 > beta > 0
+    localdefaults.beta = 0.9;  % as long as 1 > beta > 0
     localdefaults.gamma = 0.25; % as long as 1 > gamma > 0  
     localdefaults.mus = ones(condet.n_ineq_constraint_cost, 1);
     localdefaults.lambdas = ones(condet.n_eq_constraint_cost, 1);    
     % For linesearch
-    localdefaults.ls_max_steps  = 50;
+    % localdeafults.escapeswitch = 0;
+    localdefaults.ls_max_steps  = 10000;
     localdefaults.ls_threshold = 1e-8;
     % For display
     localdefaults.verbosity = 1;
@@ -144,16 +145,20 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     % Main loop where we solve subproblems iteratively
     while true
         if options.verbosity >= 2
-            fprintf('Iter: %d, Cost: %f, LagGradNorm: %f \n', iter, xCurCost, xCurLagGradNorm);
+            fprintf('Iter: %d, Cost: %f, KKT residual: %.16e \n', iter, xCurCost, xCurResidual);
         elseif options.verbosity >= 1
             if mod(iter, 100) == 0 && iter ~= 0
-                fprintf('Iter: %d, Cost: %f, LagGradNorm: %f \n', iter, xCurCost, xCurLagGradNorm);
+                fprintf('Iter: %d, Cost: %f, KKT resiidual: %.16e \n', iter, xCurCost, xCurResidual);
             end
         end
         
         iter = iter + 1;
         timetic = tic();
 
+        % update flag for a stopping criterion
+        updateflag_rho = false;
+        updateflag_Lagmult = false;
+        
         % Get current Hessian and gradient of the cost function.
         % Also, make a "qpinfo" structure stading for the subproblem
         % at the current point.
@@ -284,6 +289,7 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         end
         if rho < newacc
            rho = newacc + options.tau;
+           updateflag_rho = true;
         end
         
         % Compute a problem and some variables for loneArmijoLineSearch
@@ -306,8 +312,13 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         % descriptCost(meritproblem, xCur, deltaXast);
         
         while newf > ( f0 - gammadf0) && abs(newf - ( f0 - gammadf0)) > options.ls_threshold
-            if r > options.ls_max_steps
+            if r > options.ls_max_steps % || stepsize < 1e-8
                 ls_max_steps_flag = true;
+                % if options.escapeswitch
+                %     stepsize = 1;
+                %     newx = meritproblem.M.retr(xCur, deltaXast, stepsize);
+                %     newf = meritproblem.cost(newx);
+                % end
                 break;
             end
             r = r + 1;
@@ -334,6 +345,11 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         
         % Update variables to new iterate
         xCur = newx;
+        
+        if ~(isequal(mus, Lagmultipliers.ineqlin)) ...
+                || ~(isequal(lambdas, Lagmultipliers.eqlin))
+            updateflag_Lagmult = true;
+        end
         mus = Lagmultipliers.ineqlin;
         lambdas =  Lagmultipliers.eqlin;
         
@@ -361,6 +377,11 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
         elseif xCurResidual <= options.tolKKTres
             fprintf('KKT Residual tolerance reached\n');
             options.reason = "KKT Residual tolerance reached";
+            stop = true;
+        elseif dist == 0 && ~(updateflag_rho) && ~(updateflag_Lagmult)
+            % which will never occur because of the Armijo rule
+            fprintf('Any parameter was not updated');
+            options.reason = 'Any parameter was not updated';
             stop = true;
         end
         %elseif xCurLagGradNorm <= options.tolgradnorm
@@ -526,7 +547,9 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     % For additiobal stats
     function val = KKT_residual(xCur, mus, lambdas)
         xGrad = gradLagrangian(xCur, mus, lambdas);
+        manvio = manifoldViolation(xCur); 
         val = problem0.M.norm(xCur, xGrad)^2;
+        val = val + manvio^2;
         if condet.has_ineq_cost
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem0.ineq_constraint_cost{numineq};
@@ -543,5 +566,20 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
             end
         end
         val = sqrt(val);
+    end
+
+    function manvio = manifoldViolation(xCur)
+        % According to the type of manifold, calculate the violation from
+        % constraints seen as the manifold.
+        if contains(problem0.M.name(),'Sphere')         
+            y = xCur(:);
+            manvio = abs(y.'*y - 1);
+        elseif contains(problem0.M.name(),'Oblique')
+            [~,N] = size(xCur);
+            colones = ones(N, 1);
+            manvio = max(abs(diag(xCur.'*xCur)-colones));
+        else % including fixed-rank manifolds
+            manvio = 0;
+        end
     end
 end
