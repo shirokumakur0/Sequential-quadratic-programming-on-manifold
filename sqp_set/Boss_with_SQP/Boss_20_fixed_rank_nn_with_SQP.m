@@ -6,7 +6,7 @@ close all; clear all; clc;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
 row_dim = [2,3,4,5,6];
-col_ratio = [1.5, 1.75 ,2];
+%col_ratio = [1.5, 1.75 ,2];
 % fixedrank_ratio = [0.1, 0.25, 0.5];
 %tolKKTrespowerset = [1, 2, 3, 4, 5, 6]; % 1e-* tolerance
 

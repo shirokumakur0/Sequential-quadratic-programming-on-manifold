@@ -28,10 +28,10 @@ function [newdata, fail, feasibility, optimality] = timeplotprof(data, ftol, con
     %disp(newdata)
     
     %Filter through cost optimality
-    for solver = 1: ns
-        if isnan(data(rowcost, solver)) || (data(rowcost, solver) / mincost) > ftol
-            newdata(1, solver) = NaN;
-            optimality(1, solver) = 0;
-        end
-    end   
+    %for solver = 1: ns
+    %    if isnan(data(rowcost, solver)) || (data(rowcost, solver) / mincost) > ftol
+    %        newdata(1, solver) = NaN;
+    %        optimality(1, solver) = 0;
+    %    end
+    %end   
 end

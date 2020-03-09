@@ -1,12 +1,10 @@
 function plotperfprof_RC
     
-    row_dim = [5];
-    ftol = 100.02; % the tolerance ratio of function value (Won't be used, just a heritage)
+    row_dim = [2,3,4,5,6];
+    ftol = 1.02; % the tolerance ratio of function value (Won't be used, just a heritage)
     
     fig = figure;
     startingsolver = [1 1 1 1];
-    
-    plotnum = 1;
 
     for rdim = row_dim
         if rdim == 7
@@ -19,19 +17,14 @@ function plotperfprof_RC
       
         if rdim == 2
             col_ratio = [1.5 ,2];
-        elseif rdim == 7
-            col_ratio = [1.5];
         else
             col_ratio = [1.5, 1.75 ,2];
         end
         for tolKKTres = tolKKTrespowerset
-            
-            constrtol = 10^(-tolKKTres) + 1e-10; % Max violation of constraint.
-
             for cratio = col_ratio
                 cdim = ceil(cratio * rdim);
                 filename = sprintf("with_SQP_zz_RC_nn_RDim%dCDim%dTol%d.dat", rdim, cdim, tolKKTres);
-                titlename = sprintf("Dimension Row:%d Col:%d Residual: 1e-%d", rdim, cdim, tolKKTres);
+                titlename = sprintf("Dimension Row:%d Col:%d Residual: 1e-%d", rdim, cdim, tolKKTres)
                 locs = sprintf('southeast');
             
                 data = csvread(filename);
@@ -46,16 +39,13 @@ function plotperfprof_RC
                     [T(ii, :), ~,~,~] = timeplotprof(extable, ftol, constrtol);
                 end
 
-                
-                %subplot(6,3,plotnum); % nn rdim == 6
-                subplot(7,3,plotnum); % nn rdim == 3|4|5
-                %subplot(7,2,plotnum); % nn rdim == 2
-                perf(T, 1, plotnum);
-                
-                plotnum = plotnum + 1;
+                subplot(4,4,plotnum); % nn
+                %subplot(3,2,plotnum);
+                perf(T(:,startingsolver(plotnum):4), 1, plotnum);
             end
         end
     end
+
     
     function perf(T, logplot, plotnum)
         if (nargin< 2) 
@@ -93,19 +83,36 @@ function plotperfprof_RC
         
         disp(r)
         
-        for s = 1: ns
-            [xs, ys] = stairs(r(:,s), [1 : np]/np);
-            plot(xs, ys, 'LineStyle', lines{s});
-            hold on;
-        end
-             
+        %if ns == 7
+        %    r = circshift(r, [0,-1]);
+        %end
+        %if ns == 7
+            for s = 1: ns
+                [xs, ys] = stairs(r(:,s), [1 : np]/np);
+                plot(xs, ys, 'LineStyle', lines{s});
+                hold on;
+            end
+        %else
+        %    for s = 1: ns
+        %        [xs, ys] = stairs(r(:,s), [1 : np]/np);
+        %        plot(xs, ys, 'LineStyle', lines{s});
+        %        hold on;
+        %    end            
+        %end
+        
+            
         axis([ -0.1 1*(max_ratio)+0.01 0 1 ]);
         %axis([ 0 2*(max_ratio)+0.01 0 1 ]);
-       
-        legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)','Riemannian SQP'},'Location',locs,'Interpreter','latex');
+        
+        
+        %if ns == 7
+        %    legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon_interior_point', 'fmincon_SQP','Riemannian SQP','REPMSD'},'Location',locs{plotnum},'Interpreter','latex');
+        %else
+            legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)','Riemannian SQP'},'Location',locs{plotnum},'Interpreter','latex');
+        %end
         ylabel('Performance Profile');
         xlabel('$$\log_2\tau$','Interpreter','latex');
-        title(titlename);
+        title(titlenames(plotnum));
     end
 
     %response = fig2plotly(fig, 'filename', 'matlab-basic-line');
