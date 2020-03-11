@@ -87,8 +87,11 @@ for row = 1: m
 end
 
 function val = nncostfun(Y, row, col)
-    F = Y.U * Y.S * (Y.V).';
-    val = -F(row, col);
+    Vt = Y.V.';
+    val = - Y.U(row,:) * Y.S * Vt(:,col);
+    
+    %F = Y.U * Y.S * (Y.V).';
+    %val = -F(row, col);
 end
 
 %%% Equality constraints

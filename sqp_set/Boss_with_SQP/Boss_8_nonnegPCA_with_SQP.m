@@ -10,7 +10,7 @@ specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 %deltaset = [0.3, 0.7];  % Sparsity 
 %tolKKTrespowerset = [4, 6, 8, 10, 12, 13, 14]; % 1e-* tolerance
 
-% Set for performance profile
+% Set for performance profile RSQP vs IP
 dim_set = [150];
 snrset = [0.5];  % Signal Strength
 deltaset = [0.7];  % Sparsity 

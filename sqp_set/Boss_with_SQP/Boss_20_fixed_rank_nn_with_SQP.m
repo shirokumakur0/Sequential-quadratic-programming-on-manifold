@@ -17,16 +17,16 @@ for repeat = 1 : n_repeat
         fixedrank_repeat = ceil(rdim / 2);
         if rdim == 7
             tolKKTrespowerset = [2]; % 1e-* tolerance
-        elseif (rdim == 6) || (rdim == 5)
+        elseif rdim >= 6
             tolKKTrespowerset = [2]; % 1e-* tolerance
         else
             tolKKTrespowerset = [2, 3, 4, 5, 6, 7, 8]; % 1e-* tolerance
         end
       
         if (rdim == 2) || (rdim == 3)
-            col_ratio = [1.5, 2, 3];
+            col_ratio = [1.5, 2, 2.5];
         else
-            col_ratio = [1.5, 1.75, 2, 3];
+            col_ratio = [1.5, 1.75, 2, 2.5];
         end
         
         for cratio = col_ratio
@@ -36,7 +36,7 @@ for repeat = 1 : n_repeat
                     %_______Set up data______
                     cdim = ceil(cratio * rdim);
                     %rank = ceil(rratio * rdim);
-                    
+ 
                     %______Set Object matrix_____
                     % Generate a random mxn matrix A of rank k
                     L = randn(rdim, rank);
@@ -57,12 +57,14 @@ for repeat = 1 : n_repeat
                     options.tolKKTres = 10^(-tolKKTres);                    
                     options.outerverbosity = options.verbosity;
                     options.beta = 0.9;
-                    
+                    options.mineigval_correction = 1e-5;
+
                     %________Setting________
                     setting.repeat = repeat;
                     setting.row_dim = rdim;
                     setting.col_dim = cdim;
                     setting.rank = rank;
+                    setting.mineigval_correction = options.mineigval_correction;
                     setting.tolKKTres =  tolKKTres;
                     setting.maxOuterIter = options.maxOuterIter;
                     setting.maxtime = options.maxtime;

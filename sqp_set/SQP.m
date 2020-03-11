@@ -312,13 +312,13 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         % descriptCost(meritproblem, xCur, deltaXast);
         
         while newf > ( f0 - gammadf0) && abs(newf - ( f0 - gammadf0)) > options.ls_threshold
-            if r > options.ls_max_steps % || stepsize < 1e-8
+            if r > options.ls_max_steps % || stepsize < 1e-10
                 ls_max_steps_flag = true;
-                % if options.escapeswitch
-                %     stepsize = 1;
-                %     newx = meritproblem.M.retr(xCur, deltaXast, stepsize);
-                %     newf = meritproblem.cost(newx);
-                % end
+                %if options.escapeswitch
+                %    stepsize = 1;
+                %    newx = meritproblem.M.retr(xCur, deltaXast, stepsize);
+                %    newf = meritproblem.cost(newx);
+                %end
                 break;
             end
             r = r + 1;
@@ -426,7 +426,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
             stats.stepsize = stepsize;
             stats.ls_max_steps_break = ls_max_steps_flag;
             stats.dist = dist;
-            stats.qpexitflag = qpexitflag;
+            stats.qpexitflag = qpexitflag
         end
         stats.rho = rho;
         stats.KKT_residual = xCurResidual;
