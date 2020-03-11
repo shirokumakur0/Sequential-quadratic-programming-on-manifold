@@ -5,7 +5,7 @@
 close all; clear all; clc;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
-row_dim = [2,3,4,5,6];
+row_dim = [2,3,4];
 %fixedrank_ratio = [0.1, 0.25, 0.5];
 %lc_dim_ratio = [0.1, 0.25, 0.5];
 %tolKKTrespowerset = [0, 1, 2, 4, 5, 6, 7]; % 1e-* tolerance
@@ -18,13 +18,13 @@ for repeat = 1 : n_repeat
         lc_dim_repeat = ceil(rdim / 2); 
         if rdim == 7
             tolKKTrespowerset = [2, 3, 4, 5, 6]; % 1e-* tolerance
-        elseif rdim == 5 || 6
+        elseif rdim == 5 || rdim == 6
             tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
         else
-            tolKKTrespowerset = [2, 3, 4, 5, 6, 7, 8]; % 1e-* tolerance
+            tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
         end
-        if rdim == 2
-            col_ratio = [1.5 ,2];
+        if rdim == 2 || rdim == 3
+            col_ratio = [1.5, 2];
         else
             col_ratio = [1.5, 1.75 ,2];
         end
@@ -85,12 +85,15 @@ for repeat = 1 : n_repeat
                         param = [rdim; cdim; rank; lc_dim; tolKKTres];
                         outputdata = [result; param]';
                         
-                        % PP according to dimension
-                        filename = sprintf('with_SQP_zz_RC_lc_RDim%dCDim%d.dat', rdim,cdim);
+                        filename = sprintf('with_SQP_zz_RC_lc_RDim%dCDim%dTol%d.dat', rdim,cdim,tolKKTres);
                         dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
+                        
+                        % PP according to dimension
+                        %filename = sprintf('with_SQP_zz_RC_lc_RDim%dCDim%d.dat', rdim,cdim);
+                        %dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
                         % PP according to tolKKTres
-                        filename = sprintf('with_SQP_zz_RC_lc_Tol%d.dat', tolKKTres);
-                        dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');                    
+                        %filename = sprintf('with_SQP_zz_RC_lc_Tol%d.dat', tolKKTres);
+                        %dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');                    
                     end
                 end
             end

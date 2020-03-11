@@ -1,4 +1,4 @@
-function [xfinal, info] = almbddmultiplier(problem0, x0, options)
+function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
 
     condet = constraintsdetail(problem0);
     
@@ -188,6 +188,8 @@ function [xfinal, info] = almbddmultiplier(problem0, x0, options)
         xPrev = xCur;
     end
     info = info(1: OuterIter+1);
+    
+    residual  = KKT_residual(); % added by MO
 
     xfinal = xCur;
 

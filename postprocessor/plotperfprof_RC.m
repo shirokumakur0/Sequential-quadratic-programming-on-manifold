@@ -1,7 +1,7 @@
 function plotperfprof_RC
     
-    row_dim = [5];
-    ftol = 100.02; % the tolerance ratio of function value (Won't be used, just a heritage)
+    row_dim = [4];
+    ftol = 1.02; % the tolerance ratio of function value (Won't be used, just a heritage)
     
     fig = figure;
     startingsolver = [1 1 1 1];
@@ -10,26 +10,26 @@ function plotperfprof_RC
 
     for rdim = row_dim
         if rdim == 7
-            tolKKTrespowerset = [2, 3, 4, 5, 6]; % 1e-* tolerance
-        elseif rdim == 6
-            tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
+            tolKKTrespowerset = [2]; % 1e-* tolerance
+        elseif (rdim == 6) || (rdim == 5)
+            tolKKTrespowerset = [2]; % 1e-* tolerance
         else
-            tolKKTrespowerset = [2, 3, 4, 5, 6, 7, 8]; % 1e-* tolerance
+            tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
         end
       
-        if rdim == 2
-            col_ratio = [1.5 ,2];
-        elseif rdim == 7
-            col_ratio = [1.5];
+        if (rdim == 2) || (rdim == 3)
+            col_ratio = [1.5, 2, 3];
         else
-            col_ratio = [1.5, 1.75 ,2];
+            col_ratio = [1.5, 1.75, 2, 3];
         end
+        
         for tolKKTres = tolKKTrespowerset
             
-            constrtol = 10^(-tolKKTres) + 1e-10; % Max violation of constraint.
+            constrtol = 10^(-tolKKTres); % Max violation of constraint.
 
             for cratio = col_ratio
                 cdim = ceil(cratio * rdim);
+                %filename = sprintf("with_SQP_zz_RC_lc_RDim%dCDim%dTol%d.dat", rdim, cdim, tolKKTres);
                 filename = sprintf("with_SQP_zz_RC_nn_RDim%dCDim%dTol%d.dat", rdim, cdim, tolKKTres);
                 titlename = sprintf("Dimension Row:%d Col:%d Residual: 1e-%d", rdim, cdim, tolKKTres);
                 locs = sprintf('southeast');
@@ -42,13 +42,13 @@ function plotperfprof_RC
                     extable = data(ii, 1 : 12);
                     extable = extable';
                     extable = reshape(extable, [3, 4]);
-                    extable(extable == 0) = eps;
+                    %extable(extable == 0) = eps;
                     [T(ii, :), ~,~,~] = timeplotprof(extable, ftol, constrtol);
                 end
 
                 
-                %subplot(6,3,plotnum); % nn rdim == 6
-                subplot(7,3,plotnum); % nn rdim == 3|4|5
+                subplot(6,4,plotnum); % nn rdim == 6
+                %subplot(6,2,plotnum); % nn rdim == 3|4|5
                 %subplot(7,2,plotnum); % nn rdim == 2
                 perf(T, 1, plotnum);
                 

@@ -47,14 +47,15 @@ condet = constraintsdetail(problem);
         %ALM
         fprintf('Starting ALM \n');
         timetic = tic();
-        [xfinal, info] = almbddmultiplier(problem, x0, options);
+        [xfinal, info, residual] = almbddmultiplier(problem, x0, options);
         time = toc(timetic);
         filename = sprintf('BC_ALM_nrep%dDim%dDen%.3fTol%d.csv',setting.repeat,setting.dim, setting.density, setting.tolKKTres);
         struct2csv(info, filename);
 
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
-        data(1, 1) = maxviolation;
+        
+        data(1, 1) = residual;
         data(2, 1) = cost;
         data(3, 1) = time;
     end
@@ -63,7 +64,7 @@ condet = constraintsdetail(problem);
         %LQH
         fprintf('Starting LQH \n');
         timetic = tic();
-        [xfinal, info] = exactpenaltyViaSmoothinglqh(problem, x0, options);
+        [xfinal, info, residual] = exactpenaltyViaSmoothinglqh(problem, x0, options);
         time = toc(timetic);
         
         filename = sprintf('BC_LQH_nrep%dDim%dDen%.3fTol%d.csv',setting.repeat,setting.dim, setting.density, setting.tolKKTres);
@@ -71,7 +72,7 @@ condet = constraintsdetail(problem);
         
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
-        data(1, 2) = maxviolation;
+        data(1, 2) = residual;
         data(2, 2) = cost;
         data(3, 2) = time;
     end
@@ -81,7 +82,7 @@ condet = constraintsdetail(problem);
         %LSE
         fprintf('Starting LSE \n');
         timetic = tic();
-        [xfinal, info] = exactpenaltyViaSmoothinglse(problem, x0, options);
+        [xfinal, info, residual] = exactpenaltyViaSmoothinglse(problem, x0, options);
         time = toc(timetic);
 
         filename = sprintf('BC_LSE_nrep%dDim%dDen%.3fTol%d.csv',setting.repeat,setting.dim, setting.density, setting.tolKKTres);
@@ -89,7 +90,7 @@ condet = constraintsdetail(problem);
         
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
-        data(1, 3) = maxviolation;
+        data(1, 3) = residual;
         data(2, 3) = cost;
         data(3, 3) = time;
     end
@@ -111,19 +112,21 @@ condet = constraintsdetail(problem);
                 'SpecifyObjectiveGradient', true, 'SpecifyConstraintGradient', true, 'OutputFcn', @outfun,...
                 'StepTolerance', fmincontolerance, 'ConstraintTolerance', fmincontolerance, 'OptimalityTolerance', fmincontolerance);
         end
-        timetic = tic();
         history = struct();
         history.iter = [];
         history.cost = [];
+        history.time = [];
         history.LagGradNorm = [];
         history.maxviolation = [];
         history.KKT_residual = [];
         
+        timetic = tic();
         [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], [], [], @nonlcon, fminconoptions);
         time = toc(timetic);
         
         history.iter(1,:) =[];
         history.cost(1,:) = [];
+        history.time(1,:) = [];
         history.LagGradNorm(1,:) = [];
         history.maxviolation(1,:) = [];
         history.KKT_residual(1,:) = [];
@@ -133,7 +136,7 @@ condet = constraintsdetail(problem);
         
         xfinal = reshape(xfinal, [rankY, N]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        data(1, 4) = output.constrviolation;
+        data(1, 4) = KKT_residual;
         data(2, 4) = cost;
         data(3, 4) = time;
     end
@@ -158,6 +161,7 @@ condet = constraintsdetail(problem);
         history = struct();
         history.iter = [];
         history.cost = [];
+        history.time = [];
         history.LagGradNorm = [];
         history.maxviolation = [];
         history.KKT_residual = [];
@@ -167,6 +171,7 @@ condet = constraintsdetail(problem);
         
         history.iter(1,:) =[];
         history.cost(1,:) = [];
+        history.time(1,:) = [];
         history.LagGradNorm(1,:) = [];
         history.maxviolation(1,:) = [];
         history.KKT_residual(1,:) = [];
@@ -176,7 +181,7 @@ condet = constraintsdetail(problem);
         
         xfinal = reshape(xfinal, [rankY, N]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        data(1, 5) = output.constrviolation;
+        data(1, 5) = KKT_residual;
         data(2, 5) = cost;
         data(3, 5) = time;
     end     
@@ -185,14 +190,14 @@ condet = constraintsdetail(problem);
         % Riemannian SQP
         fprintf('Starting Riemannian SQP \n');
         timetic = tic();
-        [xfinal, costfinal, info, ~] = SQP(problem, x0, options);
+        [xfinal, costfinal, residual, info, ~] = SQP(problem, x0, options);
         time = toc(timetic);
         filename = sprintf('BC_Riemannian_SQP_nrep%dDim%dDen%.3fTol%d.csv',setting.repeat,setting.dim, setting.density, setting.tolKKTres);
         struct2csv(info, filename);
         
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
-        data(1, 6) = maxviolation;
+        data(1, 6) = residual;
         data(2, 6) = cost;
         data(3, 6) = time;
     end
@@ -204,7 +209,6 @@ condet = constraintsdetail(problem);
     
      function stop = outfun(x, optimValues, state)
         KKT_residual = optimValues.firstorderopt^2;
-        
         [xCurc, xCurceq, ~, ~] = nonlcon(x);
         
         [cnum, ~] = size(xCurc);
@@ -223,7 +227,7 @@ condet = constraintsdetail(problem);
         KKT_residual = sqrt(KKT_residual);
         
         stop = false;
-        
+                
         if toc(timetic) > methodoptions.maxtime
             fprintf("Time limit exceeded\n")
             stop = true;
@@ -232,8 +236,11 @@ condet = constraintsdetail(problem);
             stop = true;
         end
         
+        fmincontime = toc(timetic);
+        
         history.iter = [history.iter; optimValues.iteration];
         history.cost = [history.cost;optimValues.fval];
+        history.time = [history.time; fmincontime];
         history.LagGradNorm = [history.LagGradNorm; optimValues.firstorderopt];
         history.maxviolation = [history.maxviolation; optimValues.constrviolation];
         history.KKT_residual = [history.KKT_residual; KKT_residual];

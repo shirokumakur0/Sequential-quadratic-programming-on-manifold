@@ -1,64 +1,40 @@
-function plotperfprof
+function plotperfprof    
     
-
-    
-    ftol = 1.02; % the tolerance ratio of function value
-    constrtol = 1e-9; % Max violation of constraint.
-
-
-    
-    % AO
-    %filenames = ["with_SQP_zz_AO_Dim10.dat",...
-    %    "with_SQP_zz_AO_Dim15.dat", "with_SQP_zz_AO_Dim20.dat","with_SQP_zz_AO_Dim25.dat",...
-    %    "with_SQP_zz_AO_Dim30.dat"];
-    %titlenames = ["Dimension 10", "Dimension 15",...
-    %    "Dimension 20","Dimension 25","Dimension 30"];
-    %locs = {'southeast','southeast','southeast','southeast','southeast','southeast'};
-    %set_num = 5;
-    
-    % BC
-    filenames = ["with_SQP_zz_BC_Dim10.dat",...
-        "with_SQP_zz_BC_Dim20.dat","with_SQP_zz_BC_Dim25.dat",...
-        "with_SQP_zz_BC_Dim30.dat", "with_SQP_zz_BC_Dim50.dat"];
-    titlenames = ["Dimension 10", "Dimension 15",...
-        "Dimension 20","Dimension 25","Dimension 30", "Dimension 50"];
-    locs = {'southeast','southeast','southeast','southeast','southeast','southeast'};
-    set_num = 5;
-    
-    %NNPCA
-    %filenames = ["with_SQP_zz_NNPCA_Dim30.dat", "with_SQP_zz_NNPCA_Dim50.dat",...
-    %    "with_SQP_zz_NNPCA_Dim100.dat", "with_SQP_zz_NNPCA_Dim150.dat", "with_SQP_zz_NNPCA_Dim200.dat"] %, ...
-    %    %"with_SQP_zz_NNPCA_Dim25.dat","with_SQP_zz_NNPCA_Dim30.dat","with_SQP_zz_NNPCA_Dim50.dat"];
-    %titlenames = ["Dimension 30", "Dimension 50", "Dimension 100", "Dimension 150",...
-    %    "Dimension 200"]% , "Dimension 25", "Dimension 30", "Dimension 50"];
-    %locs = {'southeast','southeast','southeast','southeast','southeast','southeast','southeast'};
-    %set_num = 5;
-    
+    ftol = 1.02; % the tolerance ratio of function value (Won't be used, just a heritage)
     
     startingsolver = [1 1 1 1 1 1];
     fig = figure;
     
-    for plotnum = 1:set_num % 7 NNPCA % 6 BC, AO
+    dim_set = [10, 50, 75, 100, 250];
+    tolKKTrespowerset = [2, 4, 6, 8, 10]; % 1e-* tolerance
     
-        filename = filenames{plotnum};
+    plotnum = 1;
 
-        data = csvread(filename);
-        [nrow, ~] = size(data);
+    for rdim = dim_set      
+        for tolKKTres = tolKKTrespowerset
+            constrtol = 10^(-tolKKTres); % Max violation of constraint.
+            filename = sprintf("with_SQP_zz_BC_Dim%dTol%d.dat", rdim, tolKKTres);
+            titlename = sprintf("Dimension: %d Residual: 1e-%d", rdim, tolKKTres);
+            locs = sprintf('southeast');
 
-        T = zeros(nrow, 6);
-        for ii = 1 : nrow
-            extable = data(ii, 1 : 18);
-            extable = extable';
-            extable = reshape(extable, [3, 6]);
-            extable(extable == 0) = eps;
-            [T(ii, :), ~,~,~] = timeplotprof(extable, ftol, constrtol);
+            data = csvread(filename);
+            [nrow, ~] = size(data);
+
+            T = zeros(nrow, 6);
+            for ii = 1 : nrow
+                extable = data(ii, 1 : 18);
+                extable = extable';
+                extable = reshape(extable, [3, 6]);
+                %extable(extable == 0) = eps;
+                [T(ii, :), ~,~,~] = timeplotprof(extable, ftol, constrtol);
+            end
+
+            subplot(5,5,plotnum); % nn rdim == 3|4|5
+            perf(T, 1, plotnum);
+
+            plotnum = plotnum + 1;
         end
-        %subplot(4,4,plotnum);  % RCs
-        subplot(3,2,plotnum);  % BC, AO
-        %subplot(3,2,plotnum); %NNPCA
-        perf(T(:,startingsolver(plotnum):6), 1, plotnum);
     end
-    
     
     function perf(T, logplot, plotnum)
         if (nargin< 2) 
@@ -91,41 +67,27 @@ function plotperfprof
         disp(r)
 
         max_ratio = max(max(r));
-        r(find(isnan(r))) = 2*(max_ratio);
+        %r(find(isnan(r))) = 2*(max_ratio);
         r = sort(r);
         
         disp(r)
         
-        %if ns == 7
-        %    r = circshift(r, [0,-1]);
-        %end
-        %if ns == 7
-        %    for s = 1: ns
-        %        [xs, ys] = stairs(r(:,s), [1 : np]/np);
-        %        plot(xs, ys, 'LineStyle', lines{s});
-        %        hold on;
-        %    end
-        %else
-            for s = 1: ns
-                [xs, ys] = stairs(r(:,s), [1 : np]/np);
-                plot(xs, ys, 'LineStyle', lines{s});
-                hold on;
-            end            
-        %end
+        for s = 1: ns
+            [xs, ys] = stairs(r(:,s), [1 : np]/np);
+            plot(xs, ys, 'LineStyle', lines{s});
+            hold on;
+        end            
         
             
-        axis([ -0.1 1*(max_ratio)+0.01 0 1 ]);
-        %axis([ 0 2*(max_ratio)+0.01 0 1 ]);
+        %axis([ -0.1 1*(max_ratio)+0.01 0 1 ]);
+        axis([ -0.001 2*(max_ratio)+0.01 0 1 ]);
         
         
-        %if ns == 7
-        %    legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon_interior_point', 'fmincon_SQP','Riemannian SQP','REPMSD'},'Location',locs{plotnum},'Interpreter','latex');
-        %else
-            legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon_interior_point','fmincon_SQP','Riemannian SQP'},'Location',locs{plotnum},'Interpreter','latex');
-        %end
+
+        legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon_interior_point','fmincon_SQP','Riemannian SQP'},'Location',locs,'Interpreter','latex');
         ylabel('Performance Profile');
         xlabel('$$\log_2\tau$','Interpreter','latex');
-        title(titlenames(plotnum));
+        title(titlename);
     end
 
     %response = fig2plotly(fig, 'filename', 'matlab-basic-line');

@@ -1,4 +1,4 @@
-function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
+function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, options)
 % Sequential Quadratic Programming solver for smooth objective functions 
 % on Riemannian manifolds.
 %
@@ -402,6 +402,9 @@ function [xfinal, costfinal, info, options] = SQP(problem0, x0, options)
     end
     
     xfinal = xCur;
+    
+    residual  = xCurResidual; % added by MO
+
     costfinal = problem0.cost(xfinal);
     
     % Routine in charge of collecting the current iteration stats

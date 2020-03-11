@@ -4,13 +4,18 @@
 close all; clc; clear all;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
-dim_set = [10, 25, 50, 75, 100];
-%dim_set = [10, 50, 100, 150, 250, 500, 1000]; % Dimension of "the Cov Matrix"
-%snrset = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0]; % Signal Strength (original)
-%deltaset = [0.1, 0.3, 0.7, 0.9];           % Sparsity (original)
-snrset = [0.25, 0.5, 1.0];  % Signal Strength
-deltaset = [0.3, 0.7];  % Sparsity 
-tolKKTrespowerset = [2, 4, 6, 8, 10, 12, 13, 14]; % 1e-* tolerance
+% Set for performance profile
+%dim_set = [10, 25, 50, 75, 100];
+%snrset = [0.25, 0.5, 1.0];  % Signal Strength
+%deltaset = [0.3, 0.7];  % Sparsity 
+%tolKKTrespowerset = [4, 6, 8, 10, 12, 13, 14]; % 1e-* tolerance
+
+% Set for performance profile
+dim_set = [150];
+snrset = [0.5];  % Signal Strength
+deltaset = [0.7];  % Sparsity 
+tolKKTrespowerset = [2,3,5,7,9,11]; % 1e-* tolerance
+
 rank = 1;                                  % Rank of BM Relaxation. 1 if we don't.
 n_repeat = 1;                              % Number of repeat experiment
 
@@ -55,7 +60,7 @@ for repeat = 1: n_repeat
                     setting.maxtime = options.maxtime;
                     setting.Z = Z;
 
-                    specifier.ind = [1, 1, 1, 1, 1, 1];
+                    specifier.ind = [0, 0, 0, 1, 0, 1];
 
                     result = clientconstraint_sphere_nonnegativePCA_with_SQP(X, rank, options, specifier, setting);
                     result = result(:);

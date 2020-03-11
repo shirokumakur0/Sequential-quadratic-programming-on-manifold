@@ -154,16 +154,16 @@ end
         %ALM
         fprintf('Starting ALM \n');
         timetic = tic();
-        [xfinal, info] = almbddmultiplier(problem, x0, options);
+        [xfinal, info, residual] = almbddmultiplier(problem, x0, options);
         time = toc(timetic);
         filename = sprintf('RC_lc_ALM_nrep%dRowdim%dColdim%dRank%dLcdim%dTol%d.csv',setting.repeat,setting.row_dim, setting.col_dim, setting.rank, setting.lc_dim, setting.tolKKTres);
         struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         rankflag = check_rank(xfinal);
         if rankflag ~= 1
-            maxviolation = NaN;
+            residual = NaN;
         end
-        data(1, 1) = maxviolation;
+        data(1, 1) = residual;
         data(2, 1) = cost;
         data(3, 1) = time;
     end
@@ -172,16 +172,16 @@ end
         %LQH
         fprintf('Starting LQH \n');
         timetic = tic();
-        [xfinal, info] = exactpenaltyViaSmoothinglqh(problem, x0, options);
+        [xfinal, info, residual] = exactpenaltyViaSmoothinglqh(problem, x0, options);
         time = toc(timetic);
         filename = sprintf('RC_lc_LQH_nrep%dRowdim%dColdim%dRank%dLcdim%dTol%d.csv',setting.repeat,setting.row_dim, setting.col_dim, setting.rank, setting.lc_dim, setting.tolKKTres);
         struct2csv(info, filename);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         rankflag = check_rank(xfinal);
         if rankflag ~= 1
-            maxviolation = NaN;
+            residual = NaN;
         end
-        data(1, 2) = maxviolation;
+        data(1, 2) = residual;
         data(2, 2) = cost;
         data(3, 2) = time;
     end
@@ -190,16 +190,16 @@ end
         %LSE
         fprintf('Starting LSE \n');
         timetic = tic();
-        [xfinal, info] = exactpenaltyViaSmoothinglse(problem, x0, options);
+        [xfinal, info, residual] = exactpenaltyViaSmoothinglse(problem, x0, options);
         time = toc(timetic);
         filename = sprintf('RC_lc_LSE_nrep%dRowdim%dColdim%dRank%dLcdim%dTol%d.csv',setting.repeat,setting.row_dim, setting.col_dim, setting.rank, setting.lc_dim, setting.tolKKTres);
         struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         rankflag = check_rank(xfinal);
         if rankflag ~= 1
-            maxviolation = NaN;
+            residual = NaN;
         end
-        data(1, 3) = maxviolation;
+        data(1, 3) = residual;
         data(2, 3) = cost;
         data(3, 3) = time;
     end
@@ -208,16 +208,16 @@ end
         % Riemannian SQP
         fprintf('Starting Riemannian SQP \n');
         timetic = tic();
-        [xfinal, costfinal, info,~] = SQP(problem, x0, options);
+        [xfinal, costfinal, residual, info,~] = SQP(problem, x0, options);
         time = toc(timetic);
         filename = sprintf('RC_lc_Riemannian_SQP_nrep%dRowdim%dColdim%dRank%dLcdim%dTol%d.csv',setting.repeat,setting.row_dim, setting.col_dim, setting.rank, setting.lc_dim, setting.tolKKTres);
         struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         rankflag = check_rank(xfinal);
         if rankflag ~= 1
-            maxviolation = NaN;
+            residual = NaN;
         end
-        data(1, 4) = maxviolation;
+        data(1, 4) = residual;
         data(2, 4) = cost;
         data(3, 4) = time;
     end

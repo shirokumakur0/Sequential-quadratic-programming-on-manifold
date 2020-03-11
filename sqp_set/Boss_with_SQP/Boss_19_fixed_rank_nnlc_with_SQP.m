@@ -25,7 +25,7 @@ for repeat = 1 : n_repeat
             tolKKTrespowerset = [2, 3, 4, 5, 6, 7, 8]; % 1e-* tolerance
         end
         
-        if rdim == 2
+        if rdim == 2 || 3
             col_ratio = [1.5 ,2];
         else
             col_ratio = [1.5, 1.75 ,2];
@@ -85,13 +85,16 @@ for repeat = 1 : n_repeat
                         result = result(:);
                         param = [rdim; cdim; rank; lc_dim; tolKKTres];
                         outputdata = [result; param]';
+
+                        filename = sprintf('with_SQP_zz_RC_nnlc_RDim%dCDim%dTol%d.dat', rdim,cdim,tolKKTres);
+                        dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
                         
                         % PP according to dimension
-                        filename = sprintf('with_SQP_zz_RC_nnlc_RDim%dCDim%d.dat', rdim,cdim);
-                        dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
+                        %filename = sprintf('with_SQP_zz_RC_nnlc_RDim%dCDim%d.dat', rdim,cdim);
+                        %dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
                         % PP according to tolKKTres
-                        filename = sprintf('with_SQP_zz_RC_nnlc_Tol%d.dat', tolKKTres);
-                        dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');                    
+                        %filename = sprintf('with_SQP_zz_RC_nnlc_Tol%d.dat', tolKKTres);
+                        %dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');                    
                     end
                 end
             end

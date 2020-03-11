@@ -1,4 +1,4 @@
-function [xfinal,info] = exactpenaltyViaSmoothinglqh (problem0, x0, options)
+function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, options)
 
     condet = constraintsdetail(problem0);
     
@@ -149,6 +149,8 @@ function [xfinal,info] = exactpenaltyViaSmoothinglqh (problem0, x0, options)
     end
     
     info = info(1: OuterIter+1);
+    
+    residual  = KKT_residual(); % added by MO    
     
     xfinal = xCur;
     
