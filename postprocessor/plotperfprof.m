@@ -25,7 +25,7 @@ function plotperfprof
                 extable = data(ii, 1 : 18);
                 extable = extable';
                 extable = reshape(extable, [3, 6]);
-                %extable(extable == 0) = eps;
+                extable(extable == 0) = eps;
                 [T(ii, :), ~,~,~] = timeplotprof(extable, ftol, constrtol);
             end
 
@@ -67,7 +67,7 @@ function plotperfprof
         disp(r)
 
         max_ratio = max(max(r));
-        %r(find(isnan(r))) = 2*(max_ratio);
+        r(find(isnan(r))) = 1e+50;
         r = sort(r);
         
         disp(r)

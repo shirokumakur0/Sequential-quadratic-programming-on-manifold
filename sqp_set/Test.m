@@ -1,6 +1,6 @@
 clear;
 Boss_20_fixed_rank_nn_with_SQP;
-Boss_14_modified_BC_with_SQP;
-%Boss_21_fixed_rank_lc_with_SQP;
+%Boss_14_modified_BC_with_SQP;
+Boss_21_fixed_rank_lc_with_SQP;
 %Boss_8_nonnegPCA_with_SQP;
 %Boss_19_fixed_rank_nnlc_with_SQP;

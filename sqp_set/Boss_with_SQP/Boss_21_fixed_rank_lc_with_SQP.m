@@ -5,7 +5,7 @@
 close all; clear all; clc;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
-row_dim = [50,2,3,4];
+row_dim = [2,3,4];
 %fixedrank_ratio = [0.1, 0.25, 0.5];
 %lc_dim_ratio = [0.1, 0.25, 0.5];
 %tolKKTrespowerset = [0, 1, 2, 4, 5, 6, 7]; % 1e-* tolerance
@@ -16,17 +16,20 @@ for repeat = 1 : n_repeat
     for rdim = row_dim
         fixedrank_repeat = ceil(rdim / 2);
         lc_dim_repeat = ceil(rdim / 2); 
-        if rdim == 7
-            tolKKTrespowerset = [2, 3, 4, 5, 6]; % 1e-* tolerance
-        elseif rdim == 5 || rdim == 6
-            tolKKTrespowerset = [7,2, 3, 4, 5, 6, 7]; % 1e-* tolerance
-        else
-            tolKKTrespowerset = [7,2, 3, 4, 5, 6, 7]; % 1e-* tolerance
-        end
+        tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
+        
+        %if rdim == 7
+        %    tolKKTrespowerset = [2, 3, 4, 5, 6]; % 1e-* tolerance
+        %elseif rdim == 5 || rdim == 6
+        %    tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
+        %else
+        %    tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
+        %end
+        
         if rdim == 2 || rdim == 3
-            col_ratio = [1.5, 2];
+            col_ratio = [1.5, 2, 3];
         else
-            col_ratio = [2,1.5, 1.75 ,2];
+            col_ratio = [1.5, 1.75 ,2, 3];
         end
         for cratio = col_ratio
             
@@ -40,7 +43,7 @@ for repeat = 1 : n_repeat
                         cdim = ceil(cratio * rdim);
                         %rank = ceil(rratio * rdim);
                         %lc_dim = ceil((rdim + cdim) * dimratio);
-                        rank =3;
+
                         %______Set Object matrix_____
                         % Generate a random mxn matrix A of rank k
                         L = randn(rdim, rank);
@@ -58,9 +61,10 @@ for repeat = 1 : n_repeat
                         options.maxiter = options.maxOuterIter;  % for RSQP
                         options.maxtime = 180;
                         options.tolKKTres = 10^(-tolKKTres);
-                        options.verbosity = 2;
+                        options.verbosity = 1;
                         options.outerverbosity = options.verbosity;
-                        
+                        options.mineigval_correction = 1e-5;
+
                         %________for initial point_____
                         %setting.initialppoint =  "feasible";
                         setting.initialppoint =  "random";
@@ -71,6 +75,7 @@ for repeat = 1 : n_repeat
                         setting.col_dim = cdim;
                         setting.rank = rank;
                         setting.lc_dim = lc_dim;
+                        setting.mineigval_correction = options.mineigval_correction;
                         setting.tolKKTres = tolKKTres;
                         setting.maxOuterIter = options.maxOuterIter;
                         setting.maxtime = options.maxtime;
@@ -78,7 +83,7 @@ for repeat = 1 : n_repeat
                         setting.P = P;
                         setting.PA = PA;
 
-                        specifier.ind = [0,0,0,1];
+                        specifier.ind = [1,1,1,1];
 
                         result = clientconstraint_rank_constraints_lc_with_SQP(rdim, cdim, rank, lc_dim, P, PA, options, specifier, setting);
                         result = result(:);

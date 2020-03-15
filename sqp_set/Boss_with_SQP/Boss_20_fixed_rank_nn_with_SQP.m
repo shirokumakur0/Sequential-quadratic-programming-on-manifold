@@ -15,18 +15,19 @@ n_repeat = 1;   %Number of repeat on same set of data
 for repeat = 1 : n_repeat
     for rdim = row_dim
         fixedrank_repeat = ceil(rdim / 2);
-        if rdim == 7
-            tolKKTrespowerset = [2]; % 1e-* tolerance
-        elseif rdim >= 6
-            tolKKTrespowerset = [2]; % 1e-* tolerance
-        else
-            tolKKTrespowerset = [2, 3, 4, 5, 6, 7, 8]; % 1e-* tolerance
-        end
+        tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
+        %if rdim == 7
+        %    tolKKTrespowerset = [2, 3, 4, 5]; % 1e-* tolerance
+        %elseif rdim >= 6
+        %    tolKKTrespowerset = [2, 3, 4, 5, 6]; % 1e-* tolerance
+        %else
+        %    tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
+        %end
       
         if (rdim == 2) || (rdim == 3)
-            col_ratio = [1.5, 2, 2.5];
+            col_ratio = [1.5, 2, 3];
         else
-            col_ratio = [1.5, 1.75, 2, 2.5];
+            col_ratio = [1.5, 1.75, 2, 3];
         end
         
         for cratio = col_ratio
@@ -53,10 +54,9 @@ for repeat = 1 : n_repeat
                     options.maxOuterIter = 10000;  % for Riemannian methods
                     options.maxiter = options.maxOuterIter;  % for RSQP
                     options.maxtime = 180;
-                    options.verbosity = 2;
+                    options.verbosity = 1;
                     options.tolKKTres = 10^(-tolKKTres);                    
                     options.outerverbosity = options.verbosity;
-                    options.beta = 0.9;
                     options.mineigval_correction = 1e-5;
 
                     %________Setting________
@@ -72,7 +72,7 @@ for repeat = 1 : n_repeat
                     setting.P = P;
                     setting.PA = PA;
 
-                    specifier.ind = [0,0,0,1];
+                    specifier.ind = [1,1,1,1];
 
                     result = clientconstraint_rank_constraints_nn_with_SQP(rdim, cdim, rank, P, PA, options, specifier, setting);
                     result = result(:);

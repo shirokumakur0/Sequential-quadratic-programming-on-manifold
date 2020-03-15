@@ -1,21 +1,22 @@
 function plotperfprof_RC
     
-    row_dim = [4];
+    row_dim = [2];
     ftol = 1.02; % the tolerance ratio of function value (Won't be used, just a heritage)
     
     fig = figure;
     startingsolver = [1 1 1 1];
     
     plotnum = 1;
+    tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
 
     for rdim = row_dim
-        if rdim == 7
-            tolKKTrespowerset = [2]; % 1e-* tolerance
-        elseif (rdim == 6) || (rdim == 5)
-            tolKKTrespowerset = [2]; % 1e-* tolerance
-        else
-            tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
-        end
+        %if rdim == 7
+        %    tolKKTrespowerset = [2]; % 1e-* tolerance
+        %elseif (rdim == 6) || (rdim == 5)
+        %    tolKKTrespowerset = [2]; % 1e-* tolerance
+        %else
+        %    tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
+        %end
       
         if (rdim == 2) || (rdim == 3)
             col_ratio = [1.5, 2, 3];
@@ -42,12 +43,12 @@ function plotperfprof_RC
                     extable = data(ii, 1 : 12);
                     extable = extable';
                     extable = reshape(extable, [3, 4]);
-                    %extable(extable == 0) = eps;
+                    extable(extable == 0) = eps;
                     [T(ii, :), ~,~,~] = timeplotprof(extable, ftol, constrtol);
                 end
 
                 
-                subplot(6,4,plotnum); % nn rdim == 6
+                subplot(6,3,plotnum); % nn rdim == 6
                 %subplot(6,2,plotnum); % nn rdim == 3|4|5
                 %subplot(7,2,plotnum); % nn rdim == 2
                 perf(T, 1, plotnum);
@@ -88,7 +89,7 @@ function plotperfprof_RC
         disp(r)
 
         max_ratio = max(max(r));
-        r(find(isnan(r))) = 2*(max_ratio);
+        r(find(isnan(r))) = 1e+50;
         r = sort(r);
         
         disp(r)
@@ -99,8 +100,8 @@ function plotperfprof_RC
             hold on;
         end
              
-        axis([ -0.1 1*(max_ratio)+0.01 0 1 ]);
-        %axis([ 0 2*(max_ratio)+0.01 0 1 ]);
+        %axis([ -0.1 1*(max_ratio)+0.01 0 1 ]);
+        axis([ -0.001 2*(max_ratio)+0.01 0 1 ]);
        
         legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)','Riemannian SQP'},'Location',locs,'Interpreter','latex');
         ylabel('Performance Profile');

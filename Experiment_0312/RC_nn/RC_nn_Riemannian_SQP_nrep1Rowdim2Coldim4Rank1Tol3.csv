@@ -1,0 +1,3 @@
+"iter","cost","gradnorm","time","stepsize","ls_max_steps_break","dist","qpexitflag","rho","KKT_residual","maxviolation","meanviolation",
+0,9.4765,3.9792,8.269e-05,NaN,NaN,NaN,NaN,1,3.9796,0.038279,0.010878,
+1,7.0188,1.1905e-09,0.010627,1,0,59.5534,1,3.1005,1.1905e-09,0,0,

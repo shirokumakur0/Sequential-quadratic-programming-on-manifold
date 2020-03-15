@@ -426,7 +426,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
             stats.stepsize = stepsize;
             stats.ls_max_steps_break = ls_max_steps_flag;
             stats.dist = dist;
-            stats.qpexitflag = qpexitflag
+            stats.qpexitflag = qpexitflag;
         end
         stats.rho = rho;
         stats.KKT_residual = xCurResidual;
