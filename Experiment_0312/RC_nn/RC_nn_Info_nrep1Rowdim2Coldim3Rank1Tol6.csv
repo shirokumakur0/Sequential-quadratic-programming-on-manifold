@@ -1,3 +1,0 @@
-"repeat","row_dim","col_dim","rank","mineigval_correction","tolKKTres","maxOuterIter","maxtime","verbosity","P","PA",
-1,2,3,1,1e-05,6,10000,180,1,0,0,1,0,0,-0.21337,
-,,,,,,,,,1,0,0,-1.8787,0,0,
