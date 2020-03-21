@@ -66,8 +66,8 @@ for repeat = 1 : n_repeat
                         options.mineigval_correction = 1e-5;
 
                         %________for initial point_____
-                        %setting.initialppoint =  "feasible";
-                        setting.initialppoint =  "random";
+                        %setting.initialpoint =  "feasible";
+                        setting.initialpoint =  "random";
                         
                         %________Setting________
                         setting.repeat = repeat;

@@ -64,8 +64,8 @@ for repeat = 1 : n_repeat
                         options.outerverbosity = options.verbosity;
 
                         %________for initial point_____
-                        %setting.initialppoint =  "feasible";
-                        setting.initialppoint =  "random";
+                        %setting.initialpoint =  "feasible";
+                        setting.initialpoint =  "random";
                         %________Setting________
                         setting.repeat = repeat;
                         setting.row_dim = rdim;

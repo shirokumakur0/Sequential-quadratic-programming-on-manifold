@@ -5,8 +5,7 @@ data = NaN(3, 4);
 
 M = fixedrankembeddedfactory(m, n, k); % m: # of rows, n: # of cols, k: rank
 problem.M = M;
-x0 = M.rand();
-setting.x0 = x0;
+% initial point will be created later
 
 % Define the problem cost function. The input X is a structure with
 % fields U, S, V representing a rank k matrix as U*S*V'.
@@ -110,6 +109,17 @@ problem.ineq_constraint_hess = ineq_constraints_hess;
 
 
 condet = constraintsdetail(problem);
+
+%% Generating x0
+if strcmp(setting.initialpoint, "feasible")
+    x0 = struct();
+    x0.U = [eye(k);zeros(m-k,k)];
+    x0.S = eye(k);
+    x0.V = [eye(k);zeros(n-k,k)];
+else
+    x0 = M.rand();
+end
+setting.x0 = x0;
 
 %% Calculating by solvers
 

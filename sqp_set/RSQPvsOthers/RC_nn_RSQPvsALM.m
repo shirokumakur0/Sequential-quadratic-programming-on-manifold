@@ -31,11 +31,15 @@ for repeat = 1 : n_repeat
         options.maxOuterIter = 100000;  % for Riemannian methods
         options.maxiter = options.maxOuterIter;  % for RSQP
         options.maxtime = 600;
-        options.verbosity = 1;
+        options.verbosity = 2;
         options.tolKKTres = 10^(-tolKKTres);                    
         options.outerverbosity = options.verbosity;
         options.mineigval_correction = 1e-5;
 
+        %________for initial point_____
+        setting.initialpoint =  "feasible";
+        %setting.initialpoint =  "random";
+        
         %________Setting________
         setting.repeat = repeat;
         setting.row_dim = rdim;

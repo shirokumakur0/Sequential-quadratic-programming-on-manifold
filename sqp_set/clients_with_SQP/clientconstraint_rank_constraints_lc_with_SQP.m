@@ -138,7 +138,7 @@ problem.eq_constraint_hess = eq_constraints_hess;
 condet = constraintsdetail(problem);
 
 %% Generating x0
-if strcmp(setting.initialppoint, "feasible")
+if strcmp(setting.initialpoint, "feasible")
     x0 = struct();
     x0.U = D;
     x0.S = eye(k);

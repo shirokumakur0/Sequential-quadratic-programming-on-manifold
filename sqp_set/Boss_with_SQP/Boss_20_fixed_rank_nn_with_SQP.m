@@ -50,6 +50,11 @@ for repeat = 1 : n_repeat
                     % Hence, we know the nonzero entries in PA:
                     PA = P.*A;
                     
+                    %________for initial point_____
+                    %setting.initialpoint =  "feasible";
+                    setting.initialpoint =  "random";
+                        
+                    
                     %________Experiment_____
                     options.maxOuterIter = 10000;  % for Riemannian methods
                     options.maxiter = options.maxOuterIter;  % for RSQP
