@@ -6,6 +6,7 @@ data = NaN(3, 4);
 M = fixedrankembeddedfactory(m, n, k); % m: # of rows, n: # of cols, k: rank
 problem.M = M;
 x0 = M.rand();
+setting.x0 = x0;
 
 % Define the problem cost function. The input X is a structure with
 % fields U, S, V representing a rank k matrix as U*S*V'.
@@ -127,6 +128,7 @@ condet = constraintsdetail(problem);
         if rankflag ~= 1
             residual = NaN;
         end
+        %checkSVD(xfinal); % added for DEBUG
         data(1, 1) = residual;
         data(2, 1) = cost;
         data(3, 1) = time;
@@ -145,6 +147,7 @@ condet = constraintsdetail(problem);
         if rankflag ~= 1
             residual = NaN;
         end
+        %checkSVD(xfinal); % added for DEBUG
         data(1, 2) = residual;
         data(2, 2) = cost;
         data(3, 2) = time;
@@ -160,6 +163,7 @@ condet = constraintsdetail(problem);
         struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         rankflag = check_rank(xfinal);
+        %checkSVD(xfinal); % added for DEBUG
         if rankflag ~= 1
             residual = NaN;
         end
@@ -181,6 +185,7 @@ condet = constraintsdetail(problem);
         if rankflag ~= 1
             residual = NaN;
         end
+        %checkSVD(xfinal); % added for DEBUG
         data(1, 4) = residual;
         data(2, 4) = cost;
         data(3, 4) = time;
@@ -201,4 +206,10 @@ condet = constraintsdetail(problem);
             rankflag = 1;
         end
     end
+
+    function checkSVD(xfinal)
+       xfinalmat = xfinal.U * xfinal.S * xfinal.V';
+       e = svd(xfinalmat)
+    end
+
 end

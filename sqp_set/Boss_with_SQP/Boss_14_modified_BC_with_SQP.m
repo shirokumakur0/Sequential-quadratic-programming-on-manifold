@@ -12,7 +12,7 @@ dim_set = [10, 50, 75, 100, 250];
 density_set = [0.005 ,0.01, 0.02, 0.03, 0.04];
 tolKKTrespowerset = [2, 4, 6, 8, 10]; % 1e-* tolerance
 
-n_repeat = 1;   %Number of repeat on same set of data
+n_repeat = 4;   %Number of repeat on same set of data
 rank = 2;     %Graph Bisection
 seed_size = 5; %fixed seed size for BA
 prob_ER = 0.5; %probability of connecting an edge in ER graph.

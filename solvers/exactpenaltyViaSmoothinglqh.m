@@ -235,9 +235,11 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
     % Added by MO
     function val = KKT_residual()
         grad = gradLag(xCur, problem0, epsilon);
-        manvio = manifoldViolation(xCur);
         val = problem0.M.norm(xCur, grad)^2;
+        manvio = manifoldViolation(xCur);
+        compowvio = complementaryPowerViolation(xCur, problem0, epsilon);
         val = val + manvio^2;
+        val = val + compowvio;
         if condet.has_ineq_cost
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem0.ineq_constraint_cost{numineq};
@@ -256,6 +258,19 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
         val = sqrt(val);
     end
     
+    function compowvio = complementaryPowerViolation(x, problem, u)
+        compowvio = 0;
+        if condet.has_ineq_cost
+            for numineq = 1: condet.n_ineq_constraint_cost
+                costhandle = problem.ineq_constraint_cost{numineq};            
+                cost_at_x = costhandle(x);
+                lambda = 1 / ( 1 + exp(- cost_at_x / u) );
+                violation = lambda * cost_at_x;
+                compowvio = compowvio + violation^2;
+            end
+        end
+    end
+
     % Added by MO
     function val = gradLag(x, problem, u)
         val = getGradient(problem, x);

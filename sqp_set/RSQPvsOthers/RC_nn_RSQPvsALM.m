@@ -8,7 +8,7 @@ specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 rdim = 4;
 cdim = 8;
 rank = 2;
-tolKKTrespowerset = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]; % 1e-* tolerance 
+tolKKTrespowerset = [20]; % 1e-* tolerance 
 n_repeat = 1;   %Number of repeat on same set of data
 
 for repeat = 1 : n_repeat
@@ -28,9 +28,9 @@ for repeat = 1 : n_repeat
         PA = P.*A;
 
         %________Experiment_____
-        options.maxOuterIter = 10000;  % for Riemannian methods
+        options.maxOuterIter = 100000;  % for Riemannian methods
         options.maxiter = options.maxOuterIter;  % for RSQP
-        options.maxtime = 180;
+        options.maxtime = 600;
         options.verbosity = 1;
         options.tolKKTres = 10^(-tolKKTres);                    
         options.outerverbosity = options.verbosity;

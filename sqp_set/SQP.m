@@ -550,9 +550,16 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
     % For additiobal stats
     function val = KKT_residual(xCur, mus, lambdas)
         xGrad = gradLagrangian(xCur, mus, lambdas);
-        manvio = manifoldViolation(xCur); 
         val = problem0.M.norm(xCur, xGrad)^2;
+        
+        manvio = manifoldViolation(xCur);         
+        compowvio = complementaryPowerViolation(xCur, mus);
+        muspowvio = musposiPowerViolation(mus);
+        
         val = val + manvio^2;
+        val = val + compowvio;
+        val = val + muspowvio;
+        
         if condet.has_ineq_cost
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem0.ineq_constraint_cost{numineq};
@@ -569,6 +576,28 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
             end
         end
         val = sqrt(val);
+    end
+
+    function compowvio = complementaryPowerViolation(xCur, mus)
+        compowvio = 0;
+        if condet.has_ineq_cost
+            for numineq = 1: condet.n_ineq_constraint_cost
+                costhandle = problem0.ineq_constraint_cost{numineq};
+                cost_at_x = costhandle(xCur);
+                violation = mus(numineq) * cost_at_x;
+                compowvio = compowvio + violation^2;
+            end
+        end
+    end
+
+    function musvio = musposiPowerViolation(mus)
+        musvio = 0;
+        if condet.has_ineq_cost
+            for numineq = 1: condet.n_ineq_constraint_cost
+                violation = max(-mus(numineq), 0);
+                musvio = musvio + violation^2;
+            end
+        end
     end
 
     function manvio = manifoldViolation(xCur)

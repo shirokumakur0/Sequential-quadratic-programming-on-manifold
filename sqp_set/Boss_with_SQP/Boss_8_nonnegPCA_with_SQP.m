@@ -11,7 +11,7 @@ deltaset = [0.3, 0.7];  % Sparsity
 tolKKTrespowerset = [2, 4, 6, 8, 10]; % 1e-* tolerance
 
 rank = 1;                                  % Rank of BM Relaxation. 1 if we don't.
-n_repeat = 1;                              % Number of repeat experiment
+n_repeat = 4;                              % Number of repeat experiment
 
 for repeat = 1: n_repeat
     

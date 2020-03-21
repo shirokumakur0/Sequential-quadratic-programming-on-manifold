@@ -8,7 +8,7 @@ specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 dim_set = [150];
 snrset = [0.5];  % Signal Strength
 deltaset = [0.7];  % Sparsity 
-tolKKTrespowerset = [1,2,3,4,5,7,8,9,10,11]; % 1e-* tolerance
+tolKKTrespowerset = [20]; % 1e-* tolerance
 
 rank = 1;                                  % Rank of BM Relaxation. 1 if we don't.
 n_repeat = 1;                              % Number of repeat experiment
@@ -37,9 +37,9 @@ for repeat = 1: n_repeat
                     X = X+Z;
 
                     %________Experiment_____
-                    options.maxOuterIter = 10000; % for Riemannian methods & fmincon
+                    options.maxOuterIter = 100000; % for Riemannian methods & fmincon
                     options.maxiter = options.maxOuterIter;  % for RSQP
-                    options.maxtime = 180;
+                    options.maxtime = 600;
                     options.tolKKTres = 10^(-tolKKTres);
                     options.outerverbosity = 1;
                     options.verbosity = options.outerverbosity;

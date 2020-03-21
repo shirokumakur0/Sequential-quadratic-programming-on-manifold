@@ -38,7 +38,8 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
     OuterIter = 0;
     
     % for savestats, by MO
-    gradLagfun = @(X) gradLag(X, problem0, lambdas, gammas);
+    gradLagfun = @(X) grad_alm(X, problem0, rho, lambdas, gammas);
+    complviofun = @(x) complementaryPowerViolation(x, rho, lambdas);
     xCurLagGrad = gradLagfun(xCur);
     xCurLagGradNorm = problem0.M.norm(xCur, xCurLagGrad);
     xCurMaxLagMult = maxabsLagrangemultipliers(lambdas, gammas);
@@ -73,7 +74,9 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
         [xCur, cost, innerinfo, Oldinneroptions] = rlbfgs(problem, xCur, inneroptions);
         
         % For KKT Residual, by MO
-        gradLagfun = @(X) gradLag(X, problem0, lambdas, gammas);
+        %gradLagfun = @(X) grad_alm(X, problem0, rho, lambdas, gammas);
+        gradLagfun = gradfun;
+        complviofun = @(x) complementaryPowerViolation(x, rho, lambdas);
         
         % updating judge for exit, added by MO
         updateflag_rho = false;
@@ -262,9 +265,15 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
     % For additiobal stats (MO)
      function val = KKT_residual()
         xGrad = gradLagfun(xCur);
-        manvio = manifoldViolation(xCur);
         val = (problem0.M.norm(xCur, xGrad))^2;
+
+        manvio = manifoldViolation(xCur);
+        compowvio = complviofun(xCur);
+        %lampowvio = lamposiPowerViolation(lambdas);  % Unnecessary
+        
         val = val + manvio^2;
+        val = val + compowvio;
+        %val = val + lampowvio; % Unncecessary
         if condet.has_ineq_cost
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem0.ineq_constraint_cost{numineq};
@@ -284,7 +293,28 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
         %stats.violation_sum = val;
      end
 
-     % added by MO
+    function compowvio = complementaryPowerViolation(xCur, rho, lambdas)
+        compowvio = 0;
+        if condet.has_ineq_cost
+            for numineq = 1: condet.n_ineq_constraint_cost
+                costhandle = problem0.ineq_constraint_cost{numineq};
+                cost_numineq = costhandle(xCur);
+                if (rho * cost_numineq + lambdas(numineq) > 0)
+                    violation = (cost_numineq * rho + lambdas(numineq)) * cost_numineq;
+                    compowvio = compowvio + violation^2;
+                end
+            end
+        end
+    end
+    
+    % It isn't needed since we take max(0, \lambda^{k-1)_{i} +
+    % \rho_{k-1}g_{i}(x_{k})) as lambdas when we consider the KKT
+    % residuals.
+    %function musvio = lamposiPowerViolation(lambdas)
+    %    musvio = 0;
+    %end 
+ 
+    % added by MO
     function val = maxabsLagrangemultipliers(lambdas, gammas)
        val = -1; % meaning no constraints
        if condet.has_ineq_cost
@@ -295,32 +325,32 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
         
         if condet.has_eq_cost
             for numeq = 1:condet.n_eq_constraint_cost
-                val = max(val, abs(gammas(numeq)) );
+                val = max(val, abs(gammas(numeq)));
             end
         end
     end
 
-    % added by MO
-    function val = gradLag(x, problem0, lambdas, gammas)
-        val = getGradient(problem0, x);
-        if condet.has_ineq_cost
-            for numineq = 1: condet.n_ineq_constraint_cost
-                gradhandle = problem0.ineq_constraint_grad{numineq};
-                constraint_grad = gradhandle(x);
-                constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
-                val = problem0.M.lincomb(x, 1, val, lambdas(numineq), constraint_grad);
-            end
-        end
-
-        if condet.has_eq_cost
-            for numeq = 1:condet.n_eq_constraint_cost
-                gradhandle = problem0.eq_constraint_grad{numeq};
-                constraint_grad = gradhandle(x);
-                constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
-                val = problem0.M.lincomb(x, 1, val, gammas(numeq), constraint_grad);
-            end
-        end
-    end
+    % added by MO % This isn't used for KKT residual
+    %function val = gradLag(x, problem0, lambdas, gammas)
+    %    val = getGradient(problem0, x);
+    %    if condet.has_ineq_cost
+    %        for numineq = 1: condet.n_ineq_constraint_cost
+    %            gradhandle = problem0.ineq_constraint_grad{numineq};
+    %            constraint_grad = gradhandle(x);
+    %            constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
+    %            val = problem0.M.lincomb(x, 1, val, lambdas(numineq), constraint_grad);
+    %        end
+    %    end
+    %
+    %    if condet.has_eq_cost
+    %        for numeq = 1:condet.n_eq_constraint_cost
+    %            gradhandle = problem0.eq_constraint_grad{numeq};
+    %            constraint_grad = gradhandle(x);
+    %            constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
+    %            val = problem0.M.lincomb(x, 1, val, gammas(numeq), constraint_grad);
+    %        end
+    %    end
+    %end
 
     % added by MO, for calculating KKT residual
     function manvio = manifoldViolation(xCur)

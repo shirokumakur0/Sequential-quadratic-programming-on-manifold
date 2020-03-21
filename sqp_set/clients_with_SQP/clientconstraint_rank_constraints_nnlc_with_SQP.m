@@ -190,6 +190,8 @@ if strcmp(setting.initialppoint, "feasible")
 else
     x0 = M.rand();
 end
+setting.x0 = x0;
+
 %% Calculating by solvers
 
     options = methodoptions;

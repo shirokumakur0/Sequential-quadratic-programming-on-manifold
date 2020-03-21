@@ -10,7 +10,7 @@ specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
 dim_set = [50];
 density_set = [0.01];
-tolKKTrespowerset = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]; % 1e-* tolerance
+tolKKTrespowerset = [20]; % 1e-* tolerance
 
 n_repeat = 1;   %Number of repeat on same set of data
 rank = 2;     %Graph Bisection
@@ -30,9 +30,9 @@ for repeat = 1 : n_repeat
                 L = powerlawgraph(seed_size, prob_ER, dim, mlink);
 
                 %________Experiment_____
-                options.maxOuterIter = 10000;  % for Riemannian methods & fmincon
+                options.maxOuterIter = 100000;  % for Riemannian methods & fmincon
                 options.maxiter = options.maxOuterIter;  % for RSQP
-                options.maxtime = 180;
+                options.maxtime = 600;
                 options.tolKKTres = 10^(-tolKKTres);
                 %options.beta = 0.5; % for SQP
                 options.verbosity = 1;
@@ -48,7 +48,7 @@ for repeat = 1 : n_repeat
                 setting.maxtime = options.maxtime;
                 setting.L = L;
 
-                specifier.ind = [0,0,0,1,0,1];
+                specifier.ind = [1,1,1,1,1,1];
                 
                 result = clientconstraint_modified_oblique_balancedcut_with_SQP(L, rank, options, specifier, setting);
                 result = result(:);

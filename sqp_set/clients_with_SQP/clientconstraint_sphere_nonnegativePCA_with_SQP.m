@@ -11,6 +11,7 @@ problem.cost = @(u) costfun(u);
 problem.egrad = @(u) gradfun(u);
 problem.ehess = @(u, d) hessfun(u, d);
 x0 = M.rand();
+setting.x0 = x0;
 
 %     DEBUG only
 %     checkgradient(problem);
@@ -104,7 +105,7 @@ condet = constraintsdetail(problem);
         %FMINCON Interior point method
         fprintf('Starting fmincon_interior_point \n');
         maxiter = methodoptions.maxOuterIter;
-        maxFuniter = 1e+50;
+        maxFuniter = 1e+10;
         fmincontolerance = 0;  % disabling that stopping condition.
         if specifier.matlabversion == 0
             % Use this if you are at 2015a or older.
@@ -150,7 +151,7 @@ condet = constraintsdetail(problem);
         %FMINCON sequential qudratic programming
         fprintf('Starting fmincon_SQP \n');
         maxiter = methodoptions.maxOuterIter;
-        maxFuniter = 1e+50;        
+        maxFuniter = 1e+10;        
         fmincontolerance = 0;  % disabling the other stopping conditions.
         if specifier.matlabversion == 0
             % Use this if you are at 2015a or older.

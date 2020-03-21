@@ -10,7 +10,7 @@ row_dim = [2,3,4];
 %lc_dim_ratio = [0.1, 0.25, 0.5];
 %tolKKTrespowerset = [0, 1, 2, 4, 5, 6, 7]; % 1e-* tolerance
 
-n_repeat = 1;   %Number of repeat on same set of data
+n_repeat = 8;   %Number of repeat on same set of data
 
 for repeat = 1 : n_repeat
     for rdim = row_dim
