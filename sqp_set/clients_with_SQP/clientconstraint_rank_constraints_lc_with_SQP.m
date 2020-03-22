@@ -146,7 +146,7 @@ if strcmp(setting.initialpoint, "feasible")
 else
     x0 = M.rand();
 end
-setting.x0 = x0;
+setting.x0 = x0.U * x0.S * x0.V';
 
 %% Calculating by solvers
 
