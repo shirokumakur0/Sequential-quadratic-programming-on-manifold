@@ -51,8 +51,8 @@ for repeat = 1 : n_repeat
                     PA = P.*A;
                     
                     %________for initial point_____
-                    %setting.initialpoint =  "feasible";
-                    setting.initialpoint =  "random";
+                    setting.initialpoint =  "feasible";
+                    %setting.initialpoint =  "random";
                         
                     
                     %________Experiment_____
