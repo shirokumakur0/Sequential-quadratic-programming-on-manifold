@@ -8,7 +8,7 @@ specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 dim_set = [150];
 snrset = [0.5];  % Signal Strength
 deltaset = [0.7];  % Sparsity 
-tolKKTrespowerset = [20]; % 1e-* tolerance
+tolKKTrespowerset = [16]; % 1e-* tolerance
 
 rank = 1;                                  % Rank of BM Relaxation. 1 if we don't.
 n_repeat = 1;                              % Number of repeat experiment
@@ -41,7 +41,9 @@ for repeat = 1: n_repeat
                     options.maxiter = options.maxOuterIter;  % for RSQP
                     options.maxtime = 600;
                     options.tolKKTres = 10^(-tolKKTres);
-                    options.outerverbosity = 1;
+                    options.startingtolgradnorm = max(1e-3,10^(-tolKKTres + 3));
+                    options.endingtolgradnorm = 10^(-tolKKTres);
+                    options.outerverbosity = 2;
                     options.verbosity = options.outerverbosity;
                     %________Setting________
                     setting.repeat = repeat;
@@ -54,7 +56,7 @@ for repeat = 1: n_repeat
                     setting.maxtime = options.maxtime;
                     setting.Z = Z;
 
-                    specifier.ind = [1, 1, 1, 1, 1, 1];
+                    specifier.ind = [0, 0, 0, 0, 0, 1];
 
                     result = clientconstraint_sphere_nonnegativePCA_with_SQP(X, rank, options, specifier, setting);
                     result = result(:);

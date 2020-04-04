@@ -10,7 +10,7 @@ specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
 dim_set = [50];
 density_set = [0.01];
-tolKKTrespowerset = [20]; % 1e-* tolerance
+tolKKTrespowerset = [16]; % 1e-* tolerance
 
 n_repeat = 1;   %Number of repeat on same set of data
 rank = 2;     %Graph Bisection
@@ -33,8 +33,10 @@ for repeat = 1 : n_repeat
                 options.maxOuterIter = 100000;  % for Riemannian methods & fmincon
                 options.maxiter = options.maxOuterIter;  % for RSQP
                 options.maxtime = 600;
-                options.tolKKTres = 10^(-tolKKTres);
+                options.tolKKTres = 0;
                 %options.beta = 0.5; % for SQP
+                options.startingtolgradnorm = max(1e-3,10^(-tolKKTres + 3));
+                options.endingtolgradnorm = 10^(-tolKKTres);
                 options.verbosity = 1;
                 options.outerverbosity = options.verbosity;
 

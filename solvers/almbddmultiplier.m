@@ -18,6 +18,8 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
     localdefaults.maxInnerIter = 200;
     localdefaults.startingtolgradnorm = 1e-3;
     localdefaults.endingtolgradnorm = 1e-6;
+    % For fixed-rank manifolds, rank check at KKT residual
+    localdefaults.rankviopena = 1e+8;
     
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
     if ~exist('options', 'var') || isempty(options)
@@ -27,6 +29,16 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
     
     tolgradnorm = options.startingtolgradnorm;
     thetatolgradnorm = nthroot(options.endingtolgradnorm/options.startingtolgradnorm, options.numOuterItertgn);
+    
+    % added for the KKT residual at fixed-rank manifolds 3.31
+    if contains(problem0.M.name(),'rank')
+        if isfield(options, 'rank')
+            rankval = options.rank;
+        else
+            tmpx = problem0.M.rand();
+            rankval = rank(tmpx.S);
+        end
+    end
     
     lambdas = options.lambdas;
     gammas = options.gammas;
@@ -160,6 +172,8 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
             break;
         elseif dist == 0 && ~(updateflag_rho) && ~(updateflag_Lagmult) ...
                 && (tolgradnorm == oldtolgradnorm)
+        %if dist == 0 && ~(updateflag_rho) && ~(updateflag_Lagmult) ...
+        %        && (tolgradnorm == oldtolgradnorm)
             fprintf("Any parameter did not change\n")
             break; % because nothing changed, meaning that the alg. keeps producing the same point hereafter.
         end
@@ -267,11 +281,11 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
         xGrad = gradLagfun(xCur);
         val = (problem0.M.norm(xCur, xGrad))^2;
 
-        manvio = manifoldViolation(xCur);
+        manpowvio = manifoldPowerViolation(xCur);
         compowvio = complviofun(xCur);
         %lampowvio = lamposiPowerViolation(lambdas);  % Unnecessary
         
-        val = val + manvio^2;
+        val = val + manpowvio;
         val = val + compowvio;
         %val = val + lampowvio; % Unncecessary
         if condet.has_ineq_cost
@@ -291,6 +305,17 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
         end
         val = sqrt(val);
         %stats.violation_sum = val;
+        
+        % check if the current point satisfies the rank const. alternative
+        % role as manvio at fixed-rank manifolds
+        if contains(problem0.M.name(),'rank')
+            xCurMatRank = xCur.U * xCur.S * xCur.V';
+            xCurrank = rank(xCurMatRank);
+            if xCurrank ~= rankval
+                val = options.rankviopena; % as if Inf;
+            end
+        end
+        
      end
 
     function compowvio = complementaryPowerViolation(xCur, rho, lambdas)
@@ -353,16 +378,20 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
     %end
 
     % added by MO, for calculating KKT residual
-    function manvio = manifoldViolation(xCur)
+    function manvio = manifoldPowerViolation(xCur)
         % According to the type of manifold, calculate the violation from
         % constraints seen as the manifold.
+        manvio = 0;
         if contains(problem0.M.name(),'Sphere')         
             y = xCur(:);
-            manvio = abs(y.'*y - 1);
+            manvio = abs(y.'*y - 1)^2;
         elseif contains(problem0.M.name(),'Oblique')
             [~,N] = size(xCur);
-            colones = ones(N, 1);
-            manvio = max(abs(diag(xCur.'*xCur)-colones));
+            %colones = ones(N, 1);
+            for i = 1:N
+                manvio = manvio + abs(xCur(:,i).' * xCur(:,i) - 1)^2;
+            end
+            %manvio = max(abs(diag(xCur.'*xCur)-colones));
         else % including fixed-rank manifolds
             manvio = 0;
         end

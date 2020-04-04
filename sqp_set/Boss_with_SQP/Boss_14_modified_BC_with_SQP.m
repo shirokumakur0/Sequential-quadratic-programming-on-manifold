@@ -8,7 +8,8 @@ specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 %dim_set = [10, 50, 100, 200, 500, 1000];
 %density_set = [0.005, 0.01, 0.02, 0.04, 0.08]; %density of the Adjacency Matrix 
 
-dim_set = [10, 50, 75, 100, 250];
+%dim_set = [10, 50, 75, 100, 250];
+dim_set = [10, 50, 75, 100];
 density_set = [0.005 ,0.01, 0.02, 0.03, 0.04];
 tolKKTrespowerset = [2, 4, 6, 8, 10]; % 1e-* tolerance
 
@@ -35,6 +36,8 @@ for repeat = 1 : n_repeat
                 options.maxtime = 180;
                 options.tolKKTres = 10^(-tolKKTres);
                 %options.beta = 0.5; % for SQP
+                options.startingtolgradnorm = max(1e-3,10^(-tolKKTres + 3));
+                options.endingtolgradnorm = 10^(-tolKKTres);
                 options.verbosity = 1;
                 options.outerverbosity = options.verbosity;
 

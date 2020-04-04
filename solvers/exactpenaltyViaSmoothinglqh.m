@@ -16,12 +16,24 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
     localdefaults.maxInnerIter = 200;
     localdefaults.startingtolgradnorm = 1e-3;
     localdefaults.endingtolgradnorm = 1e-6;
-
+    % For fixed-rank manifolds, rank check at KKT residual
+    localdefaults.rankviopena = 1e+8;
+    
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
     if ~exist('options', 'var') || isempty(options)
         options = struct();
     end
     options = mergeOptions(localdefaults, options);
+
+    % added for the KKT residual at fixed-rank manifolds 3.31
+    if contains(problem0.M.name(),'rank')
+        if isfield(options, 'rank')
+            rankval = options.rank;
+        else
+            tmpx = problem0.M.rand();
+            rankval = rank(tmpx.S);
+        end
+    end    
     
     tolgradnorm = options.startingtolgradnorm;
     thetatolgradnorm = nthroot(options.endingtolgradnorm/options.startingtolgradnorm, options.numOuterItertgn);
@@ -116,6 +128,8 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
             break;
         elseif dist == 0 && (epsilon == oldeps) && (tolgradnorm == oldtolgradnorm)
             fprintf("Any parameter did not change\n")
+        %if dist == 0 && (epsilon == oldeps) && (tolgradnorm == oldtolgradnorm)
+        %    fprintf("Any parameter did not change\n")
             break; % because nothing changed, meaning that the alg. keeps producing the same point hereafter.
         end
         % The following part (norm judge and breaking) is modifiied by MO,
@@ -236,9 +250,9 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
     function val = KKT_residual()
         grad = gradLag(xCur, problem0, epsilon);
         val = problem0.M.norm(xCur, grad)^2;
-        manvio = manifoldViolation(xCur);
+        manpowvio = manifoldPowerViolation(xCur);
         compowvio = complementaryPowerViolation(xCur, problem0, epsilon);
-        val = val + manvio^2;
+        val = val + manpowvio;
         val = val + compowvio;
         if condet.has_ineq_cost
             for numineq = 1: condet.n_ineq_constraint_cost
@@ -256,6 +270,17 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
             end
         end
         val = sqrt(val);
+        
+        % check if the current point satisfies the rank const. alternative
+        % role as manvio at fixed-rank manifolds
+        if contains(problem0.M.name(),'rank')
+            xCurMatRank = xCur.U * xCur.S * xCur.V';
+            xCurrank = rank(xCurMatRank);
+            if xCurrank ~= rankval
+                val = options.rankviopena; % as if Inf;
+            end
+        end
+        
     end
     
     function compowvio = complementaryPowerViolation(x, problem, u)
@@ -326,16 +351,20 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
     end
 
     % added by MO, for calculating KKT residual
-    function manvio = manifoldViolation(xCur)
+    function manvio = manifoldPowerViolation(xCur)
         % According to the type of manifold, calculate the violation from
         % constraints seen as the manifold.
+        manvio = 0;
         if contains(problem0.M.name(),'Sphere')         
             y = xCur(:);
-            manvio = abs(y.'*y - 1);
+            manvio = abs(y.'*y - 1)^2;
         elseif contains(problem0.M.name(),'Oblique')
             [~,N] = size(xCur);
-            colones = ones(N, 1);
-            manvio = max(abs(diag(xCur.'*xCur)-colones));
+            %colones = ones(N, 1);
+            for i = 1:N
+                manvio = manvio + abs(xCur(:,i).' * xCur(:,i) - 1)^2;
+            end
+            %manvio = max(abs(diag(xCur.'*xCur)-colones));
         else % including fixed-rank manifolds
             manvio = 0;
         end

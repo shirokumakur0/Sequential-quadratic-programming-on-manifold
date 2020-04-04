@@ -5,12 +5,9 @@
 close all; clear all; clc;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
-row_dim =[2,3,4];
-%col_ratio = [1.5, 1.75 ,2];
-% fixedrank_ratio = [0.1, 0.25, 0.5];
-%tolKKTrespowerset = [1, 2, 3, 4, 5, 6]; % 1e-* tolerance
-
-n_repeat = 8;   %Number of repeat on same set of data
+%row_dim =[2,3,4,5,6,7]; % 5,6,7 might be too hard 
+row_dim =[4,5,6,7];
+n_repeat = 4;   %Number of repeat on same set of data
 
 for repeat = 1 : n_repeat
     for rdim = row_dim
@@ -60,10 +57,13 @@ for repeat = 1 : n_repeat
                     options.maxiter = options.maxOuterIter;  % for RSQP
                     options.maxtime = 180;
                     options.verbosity = 1;
-                    options.tolKKTres = 10^(-tolKKTres);                    
+                    options.tolKKTres = 10^(-tolKKTres); 
+                    options.startingtolgradnorm = max(1e-3,10^(-tolKKTres + 3));
+                    options.endingtolgradnorm = 10^(-tolKKTres);
                     options.outerverbosity = options.verbosity;
                     options.mineigval_correction = 1e-5;
-
+                    options.rank = rank;
+                    
                     %________Setting________
                     setting.repeat = repeat;
                     setting.row_dim = rdim;

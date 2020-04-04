@@ -1,2 +1,10 @@
-T = [1,2,3,4;5,6,7,8]
-T = [T(:,1:2),T(:,4)]
+clear;
+m = 5;
+n = 10;
+k = 2;
+problem.M = fixedrankembeddedfactory(m, n, k);
+
+xCur = problem.M.rand();
+
+mat = xCur.U * xCur.S * xCur.V.';
+

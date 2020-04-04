@@ -5,7 +5,7 @@ function plotperfprof
     startingsolver = [1 1 1 1 1 1];
     fig = figure;
     
-    dim_set = [10, 50, 75, 100, 250];
+    dim_set = [10, 50, 75, 100];
     tolKKTrespowerset = [2, 4, 6, 8, 10]; % 1e-* tolerance
     
     plotnum = 1;
@@ -20,16 +20,17 @@ function plotperfprof
             data = csvread(filename);
             [nrow, ~] = size(data);
 
-            T = zeros(nrow, 6);
+            T = zeros(nrow, 5);
             for ii = 1 : nrow
                 extable = data(ii, 1 : 18);
+                extable(10:12) = [];
                 extable = extable';
-                extable = reshape(extable, [3, 6]);
+                extable = reshape(extable, [3, 5]);
                 extable(extable == 0) = eps;
                 [T(ii, :), ~,~,~] = timeplotprof(extable, ftol, constrtol);
             end
 
-            subplot(5,5,plotnum); % nn rdim == 3|4|5
+            subplot(4,5,plotnum); % nn rdim == 3|4|5
             perf(T, 1, plotnum);
 
             plotnum = plotnum + 1;
@@ -83,8 +84,7 @@ function plotperfprof
         axis([ -0.001 2*(max_ratio)+0.01 0 1 ]);
         
         
-
-        legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)', 'fmincon_interior_point','fmincon_SQP','Riemannian SQP'},'Location',locs,'Interpreter','latex');
+        legend({'RALM','REPMS($Q^{lqh}$)', 'REPMS($Q^{lse}$)','fmincon_SQP','Riemannian SQP'},'Location',locs,'Interpreter','latex');
         ylabel('Performance Profile');
         xlabel('$$\log_2\tau$','Interpreter','latex');
         title(titlename);

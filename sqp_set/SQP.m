@@ -91,6 +91,8 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
     % For display
     localdefaults.verbosity = 1;
     localdefaults.qp_verbosity = 0;
+    % For fixed-rank manifolds, rank check at KKT residual
+    localdefaults.rankviopena = 1e+8;
     
     % Merge global and local defaults, then merge w/ user options, if any.
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
@@ -113,6 +115,15 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         xCur = x0;
     end
     
+    % added for the KKT residual at fixed-rank manifolds 3.31
+    if contains(problem0.M.name(),'rank')
+        if isfield(options, 'rank')
+            rankval = options.rank;
+        else
+            tmpx = problem0.M.rand();
+            rankval = rank(tmpx.S);
+        end
+    end
     
     % Create a store database and get a key for the current x
     %storedb = StoreDB(options.storedepth);
@@ -552,11 +563,11 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         xGrad = gradLagrangian(xCur, mus, lambdas);
         val = problem0.M.norm(xCur, xGrad)^2;
         
-        manvio = manifoldViolation(xCur);         
+        manpowvio = manifoldPowerViolation(xCur);         
         compowvio = complementaryPowerViolation(xCur, mus);
         muspowvio = musposiPowerViolation(mus);
         
-        val = val + manvio^2;
+        val = val + manpowvio;
         val = val + compowvio;
         val = val + muspowvio;
         
@@ -574,8 +585,19 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
                 cost_at_x = abs(costhandle(xCur));
                 val = val + cost_at_x^2;
             end
-        end
+        end        
         val = sqrt(val);
+        
+        % check if the current point satisfies the rank const. alternative
+        % role as manvio at fixed-rank manifolds
+        if contains(problem0.M.name(),'rank')
+            xCurMatRank = xCur.U * xCur.S * xCur.V';
+            xCurrank = rank(xCurMatRank);
+            if xCurrank ~= rankval
+                val = options.rankviopena; % as if Inf;
+            end
+        end
+        
     end
 
     function compowvio = complementaryPowerViolation(xCur, mus)
@@ -599,17 +621,20 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
             end
         end
     end
-
-    function manvio = manifoldViolation(xCur)
+    function manvio = manifoldPowerViolation(xCur)
         % According to the type of manifold, calculate the violation from
         % constraints seen as the manifold.
+        manvio = 0;
         if contains(problem0.M.name(),'Sphere')         
             y = xCur(:);
-            manvio = abs(y.'*y - 1);
+            manvio = abs(y.'*y - 1)^2;
         elseif contains(problem0.M.name(),'Oblique')
             [~,N] = size(xCur);
-            colones = ones(N, 1);
-            manvio = max(abs(diag(xCur.'*xCur)-colones));
+            %colones = ones(N, 1);
+            for imani = 1:N
+                manvio = manvio + abs(xCur(:,imani).' * xCur(:,imani) - 1)^2;
+            end
+            %manvio = max(abs(diag(xCur.'*xCur)-colones));
         else % including fixed-rank manifolds
             manvio = 0;
         end

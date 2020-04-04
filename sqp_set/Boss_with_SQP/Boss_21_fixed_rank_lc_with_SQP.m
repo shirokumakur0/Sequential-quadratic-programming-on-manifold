@@ -1,14 +1,11 @@
-%%
+ %%
 %-------------------------- Fixed rank (Prototype) ------------------------------------
 % NOT available for exactpenaltyViaMinimax (the solver doesn't support fixedrankembeddedfactory)
 
 close all; clear all; clc;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 
-row_dim = [2,3,4];
-%fixedrank_ratio = [0.1, 0.25, 0.5];
-%lc_dim_ratio = [0.1, 0.25, 0.5];
-%tolKKTrespowerset = [0, 1, 2, 4, 5, 6, 7]; % 1e-* tolerance
+row_dim = [2,3,4,5,6,7]; % 5,6,7 might be too hard 
 
 n_repeat = 8;   %Number of repeat on same set of data
 
@@ -61,9 +58,12 @@ for repeat = 1 : n_repeat
                         options.maxiter = options.maxOuterIter;  % for RSQP
                         options.maxtime = 180;
                         options.tolKKTres = 10^(-tolKKTres);
+                        options.startingtolgradnorm = max(1e-3,10^(-tolKKTres + 3));
+                        options.endingtolgradnorm = 10^(-tolKKTres);
                         options.verbosity = 1;
                         options.outerverbosity = options.verbosity;
                         options.mineigval_correction = 1e-5;
+                        options.rank = rank;
 
                         %________for initial point_____
                         %setting.initialpoint =  "feasible";
