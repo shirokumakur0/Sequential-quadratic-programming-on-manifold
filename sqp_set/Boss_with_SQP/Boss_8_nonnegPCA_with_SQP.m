@@ -43,7 +43,7 @@ for repeat = 1: n_repeat
                     options.tolKKTres = 10^(-tolKKTres);
                     options.startingtolgradnorm = max(1e-3,10^(-tolKKTres + 3));
                     options.endingtolgradnorm = 10^(-tolKKTres);
-                    options.outerverbosity = 1;
+                    options.outerverbosity = 2;
                     options.verbosity = options.outerverbosity;
                     %________Setting________
                     setting.repeat = repeat;
