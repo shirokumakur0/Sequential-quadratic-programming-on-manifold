@@ -48,6 +48,7 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglse (problem0, x0, op
     
     % for savestats, by MO
     xCurMaxLagMult = maxabsLagrangemultipliers(xCur, problem0, epsilon);
+    gradfun = @(X) grad_exactpenalty(X, problem0, rho);
     xCurResidual = KKT_residual();
     
     OuterIter = 0;
@@ -237,7 +238,8 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglse (problem0, x0, op
     end
     % Added by MO
     function val = KKT_residual()
-        grad = gradLag(xCur, problem0, epsilon);
+        %grad = gradLag(xCur, problem0, epsilon);
+        grad = gradfun(xCur);
         val = problem0.M.norm(xCur, grad)^2;
         manpowvio = manifoldPowerViolation(xCur);
         compowvio = complementaryPowerViolation(xCur, problem0, epsilon);
@@ -278,7 +280,9 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglse (problem0, x0, op
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem.ineq_constraint_cost{numineq};            
                 cost_at_x = costhandle(x);
-                lambda = 1 / ( 1 + exp(- cost_at_x / u) );
+                s = max(0, cost_at_x);
+                % Note the following code includes rho
+                lambda = rho * exp((cost_at_x-s)/epsilon)/(exp((cost_at_x-s)/epsilon)+exp(-s/epsilon));
                 violation = lambda * cost_at_x;
                 compowvio = compowvio + violation^2;
             end

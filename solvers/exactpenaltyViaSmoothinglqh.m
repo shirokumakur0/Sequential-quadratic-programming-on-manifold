@@ -47,7 +47,9 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
     
     % for savestats, by MO
     xCurMaxLagMult = maxabsLagrangemultipliers(xCur, problem0, epsilon);
+    gradfun = @(X) grad_exactpenalty(X, problem0, rho);
     xCurResidual = KKT_residual();
+    
     
     OuterIter = 0;
     stats = savestats(x0);
@@ -248,7 +250,8 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
 
     % Added by MO
     function val = KKT_residual()
-        grad = gradLag(xCur, problem0, epsilon);
+        %grad = gradLag(xCur, problem0, epsilon);
+        grad = gradfun(xCur);
         val = problem0.M.norm(xCur, grad)^2;
         manpowvio = manifoldPowerViolation(xCur);
         compowvio = complementaryPowerViolation(xCur, problem0, epsilon);
@@ -290,7 +293,15 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
                 costhandle = problem.ineq_constraint_cost{numineq};            
                 cost_at_x = costhandle(x);
                 lambda = 1 / ( 1 + exp(- cost_at_x / u) );
-                violation = lambda * cost_at_x;
+                
+                if cost_at_x <= 0
+                    lambda = 0;
+                elseif cost_at_x <= u
+                    lambda = cost_at_x / u;
+                else
+                    lambda = 1;
+                end
+                violation = rho * lambda * cost_at_x;
                 compowvio = compowvio + violation^2;
             end
         end
@@ -303,11 +314,16 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem.ineq_constraint_cost{numineq};            
                 cost_at_x = costhandle(x);
-                if abs(cost_at_x) <= options.tolKKTres % the threshold should be lower than tolKKTres because the violation should be lower than it.
-                    gradhandle = problem.ineq_constraint_grad{numineq};
-                    constraint_grad = gradhandle(x);
-                    constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-                    lambda = 1 / ( 1 + exp(- cost_at_x / u) );
+                gradhandle = problem.ineq_constraint_grad{numineq};
+                constraint_grad = gradhandle(x);
+                constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
+                if cost_at_x <= 0
+                    lambda = 0;
+                elseif cost_at_x <= u
+                    lambda = cost_at_x / u;
+                    val = problem.M.lincomb(x, 1, val, rho * lambda, constraint_grad);
+                else
+                    lambda = 1;
                     val = problem.M.lincomb(x, 1, val, rho * lambda, constraint_grad);
                 end
             end
@@ -319,9 +335,7 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
                 gradhandle = problem.eq_constraint_grad{numineq};
                 constraint_grad = gradhandle(x);
                 constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-                exp_plus = exp(cost_at_x / u);
-                exp_minus = exp(-cost_at_x / u);
-                gamma = (exp_plus - exp_minus) / (exp_plus + exp_minus);
+                gamma = cost_at_x / sqrt(cost_at_x^2 + u^2);
                 val = problem.M.lincomb(x, 1, val, rho * gamma, constraint_grad);
             end 
         end
@@ -334,7 +348,13 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem.ineq_constraint_cost{numineq};            
                 cost_at_x = costhandle(x);
-                lambda = 1 / ( 1 + exp(- cost_at_x / u) );
+                if cost_at_x <= 0
+                    lambda = 0;
+                elseif cost_at_x <= u
+                    lambda = cost_at_x / u;
+                else
+                    lambda = 1;
+                end
                 val = max(val, abs(lambda));
             end
         end
@@ -342,9 +362,7 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
             for numineq = 1: condet.n_eq_constraint_cost
                 costhandle = problem.eq_constraint_cost{numineq};            
                 cost_at_x = costhandle(x);
-                exp_plus = exp(cost_at_x / u);
-                exp_minus = exp(-cost_at_x / u);
-                gamma = (exp_plus - exp_minus) / (exp_plus + exp_minus);
+                gamma = cost_at_x / sqrt(cost_at_x^2 + u^2);
                 val = max(val, abs(gamma));
             end 
         end
