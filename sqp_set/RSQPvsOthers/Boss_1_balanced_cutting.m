@@ -1,23 +1,16 @@
-% This is an equality constrained optimization problem on an oblique
-% manifold. Originally the code was written by Liu in  
+%%
 %--------------------------Balanced Cut------------------------------------
 close all; clear all; clc;
-specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
+specifier.matlabversion = 0; % 0 if older than 2015 1 otherwise
 
-% (original)
-%dim_set = [10, 25, 30, 50, 60]; %dimension of the Adjacency Matrix
-%dim_set = [10, 50, 100, 200, 500, 1000];
-%density_set = [0.005, 0.01, 0.02, 0.04, 0.08]; %density of the Adjacency Matrix 
+dim_set = [50]; % dimension of the adjancecy matrix
+density_set = [0.01];  % density of the adjancency matrix
+tolKKTrespowerset = [16]; % 1e-* tolerance
 
-
-dim_set = [10, 50, 75, 100];  % dimension of the adjancency matrix
-density_set = [0.005 ,0.01, 0.02, 0.03, 0.04];  % density of the adjancency matrix
-tolKKTrespowerset = [10,2, 4, 6, 8, 10]; % 1e-* tolerance
-
-n_repeat = 4;   %Number of repeat on same set of data
-rank = 2;     %Graph Bisection
-seed_size = 5; %fixed seed size for BA
-prob_ER = 0.5; %probability of connecting an edge in ER graph.
+n_repeat = 1;   % number of repeat on same set of data
+rank = 2;     % graph bisection
+seed_size = 5; % fixed seed size for BA
+prob_ER = 0.5; % probability of connecting an edge in ER graph.
 
 for repeat = 1 : n_repeat
     
@@ -32,12 +25,11 @@ for repeat = 1 : n_repeat
                 L = powerlawgraph(seed_size, prob_ER, dim, mlink);
 
                 %________Experiment_____
-                options.maxOuterIter = 10000;  % for Riemannian methods & fmincon
-                options.maxiter = options.maxOuterIter;  % for RSQP
-                options.maxtime = 180;
+                options.maxOuterIter = 100000;  % to Riemannian penalty methods & fmincon
+                options.maxiter = options.maxOuterIter;  % to Riemannian SQP
+                options.maxtime = 600;
                 options.tolKKTres = 10^(-tolKKTres);
-                %options.beta = 0.5; % for SQP
-                options.startingtolgradnorm = max(1e-3,10^(-tolKKTres + 3));
+                options.startingtolgradnorm = max(1e-3, 10^(-tolKKTres + 3));
                 options.endingtolgradnorm = 10^(-tolKKTres);
                 options.verbosity = 1;
                 options.outerverbosity = options.verbosity;
@@ -59,16 +51,10 @@ for repeat = 1 : n_repeat
                 param = [dim; density; repeat; tolKKTres];
                 outputdata = [result; param]';
                 
-                % PP according to dimension and residual
+                % performance profile according to dimension and residual
                 filename = sprintf('with_SQP_zz_BC_Dim%dTol%d.dat', dim,tolKKTres);
                 dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
                 
-                % PP according to dimension
-                %filename = sprintf('with_SQP_zz_BC_Dim%d.dat', dim);
-                %dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
-                % PP according to dimension
-                %filename = sprintf('with_SQP_zz_BC_Tol%d.dat', tolKKTres);
-                %dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
             end
         end
     end
