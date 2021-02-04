@@ -1,5 +1,4 @@
-% This is an equality constrained optimization problem on an oblique
-% manifold. Originally the code was written by Liu in  
+%%
 %--------------------------Balanced Cut------------------------------------
 close all; clear all; clc;
 specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
@@ -9,9 +8,9 @@ specifier.matlabversion = 0; %0 if older than 2015 1 otherwise
 %dim_set = [10, 50, 100, 200, 500, 1000];
 %density_set = [0.005, 0.01, 0.02, 0.04, 0.08]; %density of the Adjacency Matrix 
 
-
-dim_set = [10, 50, 75, 100];  % dimension of the adjancency matrix
-density_set = [0.005 ,0.01, 0.02, 0.03, 0.04];  % density of the adjancency matrix
+%dim_set = [10, 50, 75, 100, 250];
+dim_set = [10, 50, 75, 100];
+density_set = [0.005 ,0.01, 0.02, 0.03, 0.04];
 tolKKTrespowerset = [10,2, 4, 6, 8, 10]; % 1e-* tolerance
 
 n_repeat = 4;   %Number of repeat on same set of data

@@ -42,7 +42,7 @@ for rdim = row_dim
 end
 
 % Check if exceeding the rank constraints
-% For RC_lc
+% For RC_nn
 row_dim = [2,3,4];
 tolKKTrespowerset = [2, 3, 4, 5, 6, 7]; % 1e-* tolerance
 

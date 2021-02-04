@@ -66,6 +66,9 @@ for repeat = 1: n_repeat
                     % PP according to dimension and tolKKTres
                     filename = sprintf('with_SQP_zz_NNPCA_Dim%dTol%d.dat', dim, tolKKTres);
                     dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
+                    % PP according to tolKKTres
+                    %filename = sprintf('with_SQP_zz_NNPCA_Tol%d.dat', tolKKTres);
+                    %dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
                 end
             end
         end
