@@ -30,7 +30,7 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
     tolgradnorm = options.startingtolgradnorm;
     thetatolgradnorm = nthroot(options.endingtolgradnorm/options.startingtolgradnorm, options.numOuterItertgn);
     
-    % added for the KKT residual at fixed-rank manifolds 3.31
+    % added for the KKT residual at fixed-rank manifolds
     if contains(problem0.M.name(),'rank')
         if isfield(options, 'rank')
             rankval = options.rank;
@@ -65,7 +65,7 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
     
     for OuterIter = 1 : options.maxOuterIter
         timetic = tic();
-        % verbosity, odified by MO
+        % verbosity, modified by MO
         if options.outerverbosity >= 2
             fprintf('Iteration: %d    ', OuterIter);
         elseif options.outerverbosity == 1 && mod(OuterIter, 100) == 0 
@@ -86,7 +86,6 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
         [xCur, cost, innerinfo, Oldinneroptions] = rlbfgs(problem, xCur, inneroptions);
         
         % For KKT Residual, by MO
-        %gradLagfun = @(X) grad_alm(X, problem0, rho, lambdas, gammas);
         gradLagfun = gradfun;
         complviofun = @(x) complementaryPowerViolation(x, rho, lambdas);
         
@@ -101,7 +100,7 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
             cost_iter = costhandler(xCur);
             newacc = max(newacc, abs(max(-lambdas(iterineq)/rho, cost_iter)));
             
-            % update judge, added by MO
+            % update judge added by MO
             newlambda = min(options.bound, max(lambdas(iterineq) + rho * cost_iter, 0));
             if lambdas(iterineq) ~= newlambda
                 lambdas(iterineq) = newlambda;
@@ -158,40 +157,22 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
         stats = savestats(xCur);
         info(OuterIter+1) = stats;
         
-        % verbosity modified by MO on March 2
+        % verbosity modified by MO 
         if options.outerverbosity >= 2
             fprintf('KKT Residual: %.16e\n', xCurResidual)
         elseif options.outerverbosity == 1 && mod(OuterIter, 100) == 0 
             fprintf('KKT Residual: %.16e\n', xCurResidual)
         end
         
-        % This is the stopping criterion based on violation_sum by MO on
-        % March 4.
+        % This is the stopping criterion based on violation_sum by MO
         if xCurResidual < options.tolKKTres && tolgradnorm <= options.endingtolgradnorm
             fprintf("KKT Residual tolerance reached\n")
             break;
         elseif dist == 0 && ~(updateflag_rho) && ~(updateflag_Lagmult) ...
                 && (tolgradnorm == oldtolgradnorm)
-        %if dist == 0 && ~(updateflag_rho) && ~(updateflag_Lagmult) ...
-        %        && (tolgradnorm == oldtolgradnorm)
             fprintf("Any parameter did not change\n")
             break; % because nothing changed, meaning that the alg. keeps producing the same point hereafter.
         end
-        
-        % The following part is as for a stopping criterion based on norm
-        % by MO, March 2, 
-        % if contains(problem0.M.name(),'rank')  % Only assuming for 'fixedrankembeddedfactory'.
-        %     if ~exist('xPrevMat', 'var')
-        %         xPrevMat = xPrev.U * xPrev.S * xPrev.V';
-        %     end
-        %     xCurMat = xCur.U * xCur.S * xCur.V';
-        %     if norm(xPrevMat - xCurMat, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
-        %         break;
-        %     end
-        %     xPrevMat = xCurMat;
-        % elseif norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
-        %     break;
-        % end
         
         % The original one, remained here, just in case
         % if norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
@@ -224,7 +205,7 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
         stats.maxviolation = maxviolation;
         stats.meanviolation = meanviolation;
         stats.cost = costCur;
-        % addding the information on Lagrange multipliers for sqp (by MO)
+        % addding the information on Lagrange multipliers by MO
         stats.maxabsLagMult = xCurMaxLagMult;  % added by MO
         stats.KKT_residual = xCurResidual;  % added by MO
         stats.LagGradNorm = xCurLagGradNorm;
@@ -304,7 +285,6 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
             end
         end
         val = sqrt(val);
-        %stats.violation_sum = val;
         
         % check if the current point satisfies the rank const. alternative
         % role as manvio at fixed-rank manifolds
@@ -355,28 +335,6 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
         end
     end
 
-    % added by MO % This isn't used for KKT residual
-    %function val = gradLag(x, problem0, lambdas, gammas)
-    %    val = getGradient(problem0, x);
-    %    if condet.has_ineq_cost
-    %        for numineq = 1: condet.n_ineq_constraint_cost
-    %            gradhandle = problem0.ineq_constraint_grad{numineq};
-    %            constraint_grad = gradhandle(x);
-    %            constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
-    %            val = problem0.M.lincomb(x, 1, val, lambdas(numineq), constraint_grad);
-    %        end
-    %    end
-    %
-    %    if condet.has_eq_cost
-    %        for numeq = 1:condet.n_eq_constraint_cost
-    %            gradhandle = problem0.eq_constraint_grad{numeq};
-    %            constraint_grad = gradhandle(x);
-    %            constraint_grad = problem0.M.egrad2rgrad(x, constraint_grad);
-    %            val = problem0.M.lincomb(x, 1, val, gammas(numeq), constraint_grad);
-    %        end
-    %    end
-    %end
-
     % added by MO, for calculating KKT residual
     function manvio = manifoldPowerViolation(xCur)
         % According to the type of manifold, calculate the violation from
@@ -387,11 +345,9 @@ function [xfinal, info, residual] = almbddmultiplier(problem0, x0, options)
             manvio = abs(y.'*y - 1)^2;
         elseif contains(problem0.M.name(),'Oblique')
             [~,N] = size(xCur);
-            %colones = ones(N, 1);
             for i = 1:N
                 manvio = manvio + abs(xCur(:,i).' * xCur(:,i) - 1)^2;
             end
-            %manvio = max(abs(diag(xCur.'*xCur)-colones));
         else % including fixed-rank manifolds
             manvio = 0;
         end

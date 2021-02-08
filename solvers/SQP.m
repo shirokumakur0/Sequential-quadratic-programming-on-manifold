@@ -41,6 +41,8 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
 % Original author: Mitsuaki Obara, January 20, 2020.
 % Contributors: 
 % Change log: 
+%           February, 8, 2021: Minor cleaning (just deleted unnecessary comments)
+%
 %           January, 20, 2020: forked from Changshuo Liu's rlbfgs.m
 %           deleted codes on localdefaults.tolgradnorm and 
 %           localdefaults.strict_inc_func 
@@ -281,7 +283,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         [coeff, ~, qpexitflag, ~, Lagmultipliers] = quadprog(qpinfo.H, qpinfo.f,...
                 qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq, [], [], [], qpoptions);     
 
-        deltaXast = problem0.M.zerovec(xCur); % Use zerovec and lincomb (March 1)
+        deltaXast = problem0.M.zerovec(xCur);
         for i = 1:qpinfo.n
             deltaXast = problem0.M.lincomb(xCur, 1, deltaXast, coeff(i), qpinfo.basis{i});
         end
@@ -325,11 +327,6 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         while newf > ( f0 - gammadf0) && abs(newf - ( f0 - gammadf0)) > options.ls_threshold
             if r > options.ls_max_steps % || stepsize < 1e-10
                 ls_max_steps_flag = true;
-                %if options.escapeswitch
-                %    stepsize = 1;
-                %    newx = meritproblem.M.retr(xCur, deltaXast, stepsize);
-                %    newf = meritproblem.cost(newx);
-                %end
                 break;
             end
             r = r + 1;
@@ -395,15 +392,6 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
             options.reason = 'Any parameter was not updated';
             stop = true;
         end
-        %elseif xCurLagGradNorm <= options.tolgradnorm
-        %    fprintf('Legrangian Gradient norm tolerance reached \n');
-        %    options.reason = "Legrangian Gradient norm tolerance reached";
-        %    stop = true;
-        %elseif dist <= options.toliterdist
-        %    fprintf('Distance of iteration tolerance reached\n');
-        %    options.reason = 'Distance of iteration tolerance reached';
-        %    stop = true;
-        %end
         
         if stop
             options.totaltime = toc(totaltime);
@@ -414,7 +402,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
     
     xfinal = xCur;
     
-    residual  = xCurResidual; % added by MO
+    residual  = xCurResidual;
 
     costfinal = problem0.cost(xfinal);
     
@@ -630,11 +618,9 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
             manvio = abs(y.'*y - 1)^2;
         elseif contains(problem0.M.name(),'Oblique')
             [~,N] = size(xCur);
-            %colones = ones(N, 1);
             for imani = 1:N
                 manvio = manvio + abs(xCur(:,imani).' * xCur(:,imani) - 1)^2;
             end
-            %manvio = max(abs(diag(xCur.'*xCur)-colones));
         else % including fixed-rank manifolds
             manvio = 0;
         end

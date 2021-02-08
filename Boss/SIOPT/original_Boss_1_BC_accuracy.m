@@ -50,7 +50,7 @@ for repeat = 1 : n_repeat
                 setting.maxtime = options.maxtime;
                 setting.L = L;
 
-                specifier.ind = [1,1,1,1,1,1];
+                specifier.ind = [1,1,1,1,1,1];  % to be [1,1,1,1,1,1]
                 
                 result = clientconstraint_modified_oblique_balancedcut_with_SQP(L, rank, options, specifier, setting);
                 result = result(:);

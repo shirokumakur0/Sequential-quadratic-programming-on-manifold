@@ -116,43 +116,20 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglse (problem0, x0, op
         epsilon  = max(options.endingepsilon, theta_epsilon * epsilon);
         tolgradnorm = max(options.endingtolgradnorm, tolgradnorm * thetatolgradnorm);
                 
-        % verbosity modified by MO on March 2
+        % verbosity 
         if options.outerverbosity >= 2
             fprintf('KKT Residual: %.16e\n', xCurResidual)
         elseif options.outerverbosity == 1 && mod(OuterIter, 100) == 0 
             fprintf('KKT Residual: %.16e\n', xCurResidual)
         end
         
-        % This is the stopping criterion based on violation_sum by MO on
-        % March 4.
+        % This is the stopping criterion based on violation_sum by MO 
         if xCurResidual < options.tolKKTres && tolgradnorm <= options.endingtolgradnorm
             fprintf("KKT residual tolerance reached\n")            
             break;
-        elseif dist == 0 && (epsilon == oldeps) && (tolgradnorm == oldtolgradnorm)
-        %if dist == 0 && (epsilon == oldeps) && (tolgradnorm == oldtolgradnorm)
-        %    fprintf("Any parameter did not change\n")            
+        elseif dist == 0 && (epsilon == oldeps) && (tolgradnorm == oldtolgradnorm)            
             break; % because nothing changed, meaning that the alg. keeps producing the same point hereafter.
         end
-        
-        % The following part (norm based judging) is modifiied by MO,
-        % March 2
-        % if contains(problem0.M.name(),'rank')  % Only assuming for 'fixedrankembeddedfactory'.
-        %     if ~exist('xPrevMat', 'var')
-        %         xPrevMat = xPrev.U * xPrev.S * xPrev.V';
-        %     end
-        %     xCurMat = xCur.U * xCur.S * xCur.V';
-        %     if norm(xPrevMat - xCurMat, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
-        %         break;
-        %     end
-        %     xPrevMat = xCurMat;
-        % elseif norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
-        %     break;
-        % end
-        % The original one, just a heritage
-        % if norm(xPrev-xCur, 'fro') < options.minstepsize && tolgradnorm <= options.endingtolgradnorm
-        %     break;
-        % end
-        % modification is up to here.
         
         xPrev = xCur;
         
@@ -180,7 +157,7 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglse (problem0, x0, op
         stats.maxviolation = maxviolation;
         stats.meanviolation = meanviolation;
         stats.cost = costCur;
-        % addding the information on Lagrange multipliers for sqp (by MO)
+        % adding the information on Lagrange multipliers by MO
         stats.maxabsLagMult = xCurMaxLagMult;  % added by MO
         stats.KKT_residual = xCurResidual;  % added by MO
     end
@@ -289,7 +266,7 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglse (problem0, x0, op
         end
     end
     
-    % Added by MO
+    % Added by MO but not needed (because we have grad_exactpenalty)
     function val = gradLag(x, problem, u)
         val = getGradient(problem, x);
         if condet.has_ineq_cost
@@ -353,11 +330,9 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglse (problem0, x0, op
             manvio = abs(y.'*y - 1)^2;
         elseif contains(problem0.M.name(),'Oblique')
             [~,N] = size(xCur);
-            %colones = ones(N, 1);
             for i = 1:N
                 manvio = manvio + abs(xCur(:,i).' * xCur(:,i) - 1)^2;
             end
-            %manvio = max(abs(diag(xCur.'*xCur)-colones));
         else % including fixed-rank manifolds
             manvio = 0;
         end

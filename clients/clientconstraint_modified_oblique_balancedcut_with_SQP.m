@@ -137,7 +137,7 @@ condet = constraintsdetail(problem);
         
         xfinal = reshape(xfinal, [rankY, N]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        data(1, 4) = KKT_residual;
+        %data(1, 4) = KKT_residual;  % comment out 0208, 2021
         data(2, 4) = cost;
         data(3, 4) = time;
     end
@@ -182,7 +182,7 @@ condet = constraintsdetail(problem);
         
         xfinal = reshape(xfinal, [rankY, N]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        data(1, 5) = KKT_residual;
+        %data(1, 5) = KKT_residual;  % comment out 0208, 2021
         data(2, 5) = cost;
         data(3, 5) = time;
     end     

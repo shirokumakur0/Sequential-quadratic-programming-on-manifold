@@ -1,11 +1,11 @@
-function data = clientconstraint_rank_constraints_nnlc_with_SQP(m, n, k, lc_dim, P, PA, methodoptions, specifier, setting)
+function data = clientconstraint_rank_constraints_nnlc_with_SQP(m, n, k, P, PA, methodoptions, specifier, setting)
 %% Manifold factory
 
 data = NaN(3, 4);
 
 M = fixedrankembeddedfactory(m, n, k); % m: # of rows, n: # of cols, k: rank
 problem.M = M;
-% Initial point will be generated later
+% initial point will be created later
 
 % Define the problem cost function. The input X is a structure with
 % fields U, S, V representing a rank k matrix as U*S*V'.
@@ -53,117 +53,82 @@ function ehess = euclidean_objhessian(X, H)
 end
 
 %     DEBUG only
-%     figure;
-%     checkgradient(problem);
-%     figure;
-%     checkhessian(problem); % OK?(output is 4 when it should be 3)
+%      figure;
+%      checkgradient(problem);
+%      figure;
+%      checkhessian(problem); 
+
+%% Setting the file path
+filepath = sprintf("nrep%dRowdim%dColdim%dRank%dTol%dEqratio%0.1e",...
+    setting.repeat, setting.row_dim, setting.col_dim, setting.rank, setting.tolKKTres,setting.eqconstratio);
 
 %% Set-up Constraints
 
 %%% Inequality constraints
-%%%% Non-negativity (ineq)
-nn_constraints_cost = cell(m * n, 1);
-for row = 1: m
-    for col = 1: n
-        nn_constraints_cost{(col-1)*m + row} = @(Y) nncostfun(Y, row, col);
-    end
-end
+%%%% Non-negativity (ineq) and element equality (eq)
+nonnegative_num = nnz(P);
+eqconstratio = setting.eqconstratio;
+eqnum = ceil(nonnegative_num * eqconstratio);
+% zP = ceil((m * n - nonnegative_num) * eqconstratio);
+ineqnum = m*n - eqnum;
 
-nn_constraints_grad = cell(m * n, 1);
+nonzeroidcs = find(P);
+s = RandStream('mlfg6331_64'); 
+eqindices = sort(randsample(s,nonzeroidcs,eqnum));
+
+eq_constraints_cost = cell(eqnum,1);
+eq_constraints_grad = cell(eqnum,1);
+eq_constraints_hess = cell(eqnum,1);
+nn_constraints_cost = cell(ineqnum, 1);
+nn_constraints_grad = cell(ineqnum, 1);
+nn_constraints_hess = cell(ineqnum, 1);
+eqconst_idx = 1;
+nnconst_idx = 1;
+
 for row = 1:m
     for col = 1:n
-        constraintgrad = zeros(m, n);
-        constraintgrad(row, col) = -1;
-        nn_constraints_grad{(col-1)*m + row} = @(U) constraintgrad;
-    end
-end
-
-nn_constraints_hess = cell(m * n, 1);
-for row = 1: m
-    for col = 1: n
-        constrainthess = zeros(m, n);
-        nn_constraints_hess{(col-1)*m + row} = @(X, U) constrainthess;
+        num = (col - 1) * m + row;
+        flag = find(eqindices == num,1);
+        if ~isempty(flag)
+            eq_constraints_cost{eqconst_idx} = @(Y) eqcostfun(Y, row, col);
+            
+            constraintgrad = zeros(m, n);
+            constraintgrad(row, col) = 1;
+            eq_constraints_grad{eqconst_idx} = @(U) constraintgrad;
+            
+            constrainthess = zeros(m, n);
+            eq_constraints_hess{eqconst_idx} = @(X, U) constrainthess;
+            eqconst_idx = eqconst_idx + 1;
+        else
+            nn_constraints_cost{nnconst_idx} = @(Y) nncostfun(Y, row, col);
+            
+            constraintgrad = zeros(m, n);
+            constraintgrad(row, col) = -1;
+            nn_constraints_grad{nnconst_idx} = @(U) constraintgrad;
+            
+            constrainthess = zeros(m, n);
+            nn_constraints_hess{nnconst_idx} = @(X, U) constrainthess;
+            nnconst_idx = nnconst_idx + 1;
+        end
     end
 end
 
 function val = nncostfun(Y, row, col)
     Vt = Y.V.';
     val = - Y.U(row,:) * Y.S * Vt(:,col);
-    
     %F = Y.U * Y.S * (Y.V).';
     %val = -F(row, col);
 end
 
-%%% Equality constraints
-%%%% Linear constraints (eq)
-while true
-    C = randi([1, 5], m*n, lc_dim);
-    C = orth(C);
-    [~,cC] = size(C);
-    if cC == lc_dim
-        break;
-    end
-end
-C = C';
-
-while true
-    l = rand(m, 2*m);
-    D = l* l';
-    idx = randperm(m, k);
-    D = D(:,idx);
-    
-    Dlog = D>=0;
-
-    if rank(D) ~= k || ~all(Dlog(:))
-       continue; 
-    end
-
-
-    E = zeros(m, n-k);
-    for i = 1:n-k
-        if k >= 2
-            idx = randperm(k,2);
-            vec = D(:,idx(1)) + D(:,idx(2));
-        else
-            idx = randperm(k,1);
-            vec = D(:,idx);
-        end
-        E(:, i) = vec;
-    end
-
-    DE = [D,E];
-    DElog = DE>=0;
-    if rank(DE) == k && all(DElog(:))
-        break;
-    end
-end
-
-d = C * DE(:);
-
-lc_constraints_cost = cell(lc_dim, 1);
-lc_constraints_grad = cell(lc_dim, 1);
-lc_constraints_hess = cell(lc_dim, 1);
-
-for row = 1 : lc_dim
-    rowC = C(row,:);
-    lc_constraints_cost{row} = @(Y) lccostfun(Y, rowC, row);
-    reshapedrowC = reshape(rowC', [m,n]);
-    lc_constraints_grad{row} = @(U) reshapedrowC;
-    lc_constraints_hess{row} = @(U, D) zeros(m, n);
-end
-
-function val = lccostfun(Y, rowC, row)
-    F = Y.U * Y.S * (Y.V).';
-    val = rowC* F(:) -d(row);
+function val = eqcostfun(Y, row, col)
+    Vt = Y.V.';
+    val = Y.U(row,:) * Y.S * Vt(:,col) - PA(row,col);
 end
 
 ineq_constraints_cost = nn_constraints_cost;
 ineq_constraints_grad = nn_constraints_grad;
 ineq_constraints_hess = nn_constraints_hess;
 
-eq_constraints_cost = lc_constraints_cost;
-eq_constraints_grad = lc_constraints_grad;
-eq_constraints_hess = lc_constraints_hess;
 
 % constraints setting
 problem.ineq_constraint_cost = ineq_constraints_cost;
@@ -174,19 +139,49 @@ problem.eq_constraint_cost = eq_constraints_cost;
 problem.eq_constraint_grad = eq_constraints_grad;
 problem.eq_constraint_hess = eq_constraints_hess;
 
-
 %     Debug Only
-%     checkconstraints_upto2ndorder(problem) % OK...? (qfocnstraints:  output is 4 when it should be 3)
-
-
+%     checkconstraints_upto2ndorder(problem) 
+     
 condet = constraintsdetail(problem);
 
 %% Generating x0
-if strcmp(setting.initialpoint, "feasible")
+if strcmp(setting.initialpoint, "eye")
     x0 = struct();
-    x0.U = D;
+    x0.U = [eye(k);zeros(m-k,k)];
     x0.S = eye(k);
     x0.V = [eye(k);zeros(n-k,k)];
+    
+elseif strcmp(setting.initialpoint, "feasible_region")
+    feasible_problem.M = M;
+    feasible_problem.cost = @zerofun;
+    feasible_problem.egrad = @egradzerofun;
+    feasible_problem.ehess = @ehesszerofun;
+    feasible_problem.ineq_constraint_cost = ineq_constraints_cost;
+    feasible_problem.ineq_constraint_grad = ineq_constraints_grad;
+    feasible_problem.ineq_constraint_hess = ineq_constraints_hess;
+    feasible_problem.eq_constraint_cost = eq_constraints_cost;
+    feasible_problem.eq_constraint_grad = eq_constraints_grad;
+    feasible_problem.eq_constraint_hess = eq_constraints_hess; 
+    feasible_x0 = M.rand();
+    %     feasible_x0 = struct();
+    %     feasible_x0.U = [eye(k);zeros(m-k,k)];
+    %     feasible_x0.S = eye(k);
+    %     feasible_x0.V = [eye(k);zeros(n-k,k)];
+    feasible_options.maxOuterIter = 200;
+    feasible_options.maxtime = 40;  % to be 600
+    feasible_options.outerverbosity = 1;  % to be 1
+    % feasible_options.verbosity = 1;  % to be 1
+    feasible_options.tolKKTres = 10^(-2);  
+    feasible_options.startingtolgradnorm = 1;
+    feasible_options.endingtolgradnorm = feasible_options.tolKKTres;
+    %     Debug Only
+    %     checkconstraints_upto2ndorder(problem) 
+    fprintf('Starting LQH to calculate a feasible point\n');
+    [x0, info, ~] = exactpenaltyViaSmoothinglqh(feasible_problem, feasible_x0, feasible_options);
+    % [x0, info, ~] = almbddmultiplier(feasible_problem, feasible_x0, feasible_options);
+    % [x0, ~, ~, info,~] = SQP(feasible_problem, feasible_x0, feasible_options);
+    filename = sprintf('RC_nn_LQH_feasible_initial_point_%s.csv',filepath);
+    struct2csv(info, filename);      
 else
     x0 = M.rand();
 end
@@ -195,20 +190,22 @@ setting.x0 = x0.U * x0.S * x0.V';
 %% Calculating by solvers
 
     options = methodoptions;
-            
+    
+
     if specifier.ind(1)
         %ALM
         fprintf('Starting ALM \n');
         timetic = tic();
         [xfinal, info, residual] = almbddmultiplier(problem, x0, options);
         time = toc(timetic);
-        filename = sprintf('RC_nnlc_ALM_nrep%dRowdim%dColdim%dRank%dLcdim%dTol%d.csv',setting.repeat,setting.row_dim, setting.col_dim, setting.rank, setting.lc_dim, setting.tolKKTres);
+        filename = sprintf('RC_nn_ALM_%s.csv',filepath);
         struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         rankflag = check_rank(xfinal);
         if rankflag ~= 1
             residual = NaN;
         end
+        %checkSVD(xfinal); % added for DEBUG
         data(1, 1) = residual;
         data(2, 1) = cost;
         data(3, 1) = time;
@@ -220,13 +217,14 @@ setting.x0 = x0.U * x0.S * x0.V';
         timetic = tic();
         [xfinal, info, residual] = exactpenaltyViaSmoothinglqh(problem, x0, options);
         time = toc(timetic);
-        filename = sprintf('RC_nnlc_LQH_nrep%dRowdim%dColdim%dRank%dLcdim%dTol%d.csv',setting.repeat,setting.row_dim, setting.col_dim, setting.rank, setting.lc_dim, setting.tolKKTres);
+        filename = sprintf('RC_nn_LQH_%s.csv',filepath);
         struct2csv(info, filename);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         rankflag = check_rank(xfinal);
         if rankflag ~= 1
             residual = NaN;
         end
+        %checkSVD(xfinal); % added for DEBUG
         data(1, 2) = residual;
         data(2, 2) = cost;
         data(3, 2) = time;
@@ -238,10 +236,11 @@ setting.x0 = x0.U * x0.S * x0.V';
         timetic = tic();
         [xfinal, info, residual] = exactpenaltyViaSmoothinglse(problem, x0, options);
         time = toc(timetic);
-        filename = sprintf('RC_nnlc_LSE_nrep%dRowdim%dColdim%dRank%dLcdim%dTol%d.csv',setting.repeat,setting.row_dim, setting.col_dim, setting.rank, setting.lc_dim, setting.tolKKTres);
+        filename = sprintf('RC_nn_LSE_%s.csv',filepath);
         struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         rankflag = check_rank(xfinal);
+        %checkSVD(xfinal); % added for DEBUG
         if rankflag ~= 1
             residual = NaN;
         end
@@ -249,26 +248,27 @@ setting.x0 = x0.U * x0.S * x0.V';
         data(2, 3) = cost;
         data(3, 3) = time;
     end
-        
+    
     if specifier.ind(4)
         % Riemannian SQP
         fprintf('Starting Riemannian SQP \n');
         timetic = tic();
         [xfinal, costfinal, residual, info,~] = SQP(problem, x0, options);
         time = toc(timetic);
-        filename = sprintf('RC_nnlc_Riemannian_SQP_nrep%dRowdim%dColdim%dRank%dLcdim%dTol%d.csv',setting.repeat,setting.row_dim, setting.col_dim, setting.rank, setting.lc_dim, setting.tolKKTres);
+        filename = sprintf('RC_nn_Riemannian_SQP_%s.csv',filepath);
         struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         rankflag = check_rank(xfinal);
         if rankflag ~= 1
             residual = NaN;
         end
+        %checkSVD(xfinal); % added for DEBUG
         data(1, 4) = residual;
         data(2, 4) = cost;
         data(3, 4) = time;
     end
     
-    filename = sprintf('RC_nnlc_Info_nrep%dRowdim%dColdim%dRank%dLcdim%dTol%d.csv',setting.repeat,setting.row_dim, setting.col_dim, setting.rank, setting.lc_dim, setting.tolKKTres);
+    filename = sprintf('RC_nnlc_Info_%s.csv',filepath);
     struct2csv(setting, filename);
     
 %% Sub functions
@@ -282,5 +282,22 @@ setting.x0 = x0.U * x0.S * x0.V';
             fprintf("Rank constraint satisfied\n")
             rankflag = 1;
         end
+    end
+
+    function checkSVD(xfinal)
+       xfinalmat = xfinal.U * xfinal.S * xfinal.V';
+       e = svd(xfinalmat)
+    end
+
+    function ans = zerofun(X)
+        ans = 0;
+    end
+
+    function ans = egradzerofun(X)
+        ans = zeros(m,n);
+    end
+
+    function ans = ehesszerofun(X,H)
+        ans = zeros(m,n);
     end
 end
