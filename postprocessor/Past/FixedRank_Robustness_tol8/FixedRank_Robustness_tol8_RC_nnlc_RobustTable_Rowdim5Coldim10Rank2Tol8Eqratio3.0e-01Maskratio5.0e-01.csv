@@ -1,0 +1,17 @@
+method,nrep,time,iter
+Riemannian_SQP,1,0.8224100000000001,11
+Riemannian_SQP,2,17.9485,231
+Riemannian_SQP,3,8.7401,113
+Riemannian_SQP,4,2.8271,36
+Riemannian_SQP,5,2.4072,32
+Riemannian_SQP,6,18.7755,234
+Riemannian_SQP,8,0.69388,9
+Riemannian_SQP,9,1.1501,15
+Riemannian_SQP,10,1.3566,18
+Riemannian_SQP,12,35.755,463
+Riemannian_SQP,13,3.1413,39
+Riemannian_SQP,14,3.3829,43
+Riemannian_SQP,15,0.74712,10
+Riemannian_SQP,17,0.81823,11
+Riemannian_SQP,19,8.91,100
+Riemannian_SQP,20,2.2739,27
