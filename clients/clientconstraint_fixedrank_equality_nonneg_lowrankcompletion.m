@@ -5,16 +5,14 @@ data = NaN(3, 4);
 
 M = fixedrankembeddedfactory(m, n, k); % m: # of rows, n: # of cols, k: rank
 problem.M = M;
+
 % initial point will be created later
 
 %% Setting the file path
-% filepath = sprintf("nrep%dRowdim%dColdim%dRank%dTol%dEqratio%0.1e",...
-%     setting.repeat, setting.row_dim, setting.col_dim, setting.rank, setting.tolKKTres,setting.eqconstratio);
 filepath = setting.filepath;
 %% Set-up Constraints
 
-%%% Inequality constraints
-%%%% Non-negativity (ineq) and element equality (eq)
+%%% nonnegativity (ineq) and equality (eq)
 [eqnum,~] = size(eqindices);
 ineqnum = m*n - eqnum;
 
@@ -58,20 +56,16 @@ end
 function val = nncostfun(Y, row, col)
     Vt = Y.V.';
     val = - Y.U(row,:) * Y.S * Vt(:,col);
-    %F = Y.U * Y.S * (Y.V).';
-    %val = -F(row, col);
 end
 
 function val = eqcostfun(Y, row, col)
     Vt = Y.V.';
     val = Y.U(row,:) * Y.S * Vt(:,col) - A(row,col);
-    % fprintf("row: %d col: %d cost: %.3f\n", row, col, val)
 end
 
 ineq_constraints_cost = nn_constraints_cost;
 ineq_constraints_grad = nn_constraints_grad;
 ineq_constraints_hess = nn_constraints_hess;
-
 
 % constraints setting
 problem.ineq_constraint_cost = ineq_constraints_cost;
@@ -88,10 +82,8 @@ problem.eq_constraint_hess = eq_constraints_hess;
 condet = constraintsdetail(problem);
 
 %% Setting a objective function
-% Note that the observed elements used as equality constraints are
+% Note that the observed elements (used as equality constraints) are
 % eliminated when constructing the objective function.
-
-% eliminate the constraints
 
 % Define the problem cost function. The input X is a structure with
 % fields U, S, V representing a rank k matrix as U*S*V'.
@@ -118,7 +110,6 @@ function G = eobjgrad(X)
     G = P.*Xmat - PA;
 end
 
-% This is optional, but it's nice if you have it.
 % Define the Euclidean Hessian of the cost at X, along H, where H is
 % represented as a tangent vector: a structure with fields Up, Vp, M.
 % This is the directional derivative of nabla f(X) at X along Xdot:
@@ -166,23 +157,18 @@ elseif strcmp(setting.initialpoint, "feasible_region")
     feasible_problem.eq_constraint_grad = eq_constraints_grad;
     feasible_problem.eq_constraint_hess = eq_constraints_hess; 
     feasible_x0 = M.rand();
-    %     feasible_x0 = struct();
-    %     feasible_x0.U = [eye(k);zeros(m-k,k)];
-    %     feasible_x0.S = eye(k);
-    %     feasible_x0.V = [eye(k);zeros(n-k,k)];
     feasible_options.maxOuterIter = 200;
-    feasible_options.maxtime = 40;  % to be 600
-    feasible_options.outerverbosity = 1;  % to be 1
-    % feasible_options.verbosity = 1;  % to be 1
+    feasible_options.maxtime = 40;  % 40
+    feasible_options.outerverbosity = 1;  % 1
     feasible_options.tolKKTres = 10^(-2);  
     feasible_options.startingtolgradnorm = 1;
     feasible_options.endingtolgradnorm = feasible_options.tolKKTres;
+    
     %     Debug Only
     %     checkconstraints_upto2ndorder(problem) 
+    
     fprintf('Starting LQH to calculate a feasible point\n');
     [x0, info, ~] = exactpenaltyViaSmoothinglqh(feasible_problem, feasible_x0, feasible_options);
-    % [x0, info, ~] = almbddmultiplier(feasible_problem, feasible_x0, feasible_options);
-    % [x0, ~, ~, info,~] = SQP(feasible_problem, feasible_x0, feasible_options);
     filename = sprintf('RC_nnlc_LQH_feasible_initial_point_%s.csv',filepath);
     struct2csv(info, filename);      
 else
@@ -196,7 +182,7 @@ setting.x0 = x0.U * x0.S * x0.V';
     
 
     if specifier.ind(1)
-        %ALM
+        % ALM
         fprintf('Starting ALM \n');
         timetic = tic();
         [xfinal, info, residual] = almbddmultiplier(problem, x0, options);
@@ -208,14 +194,15 @@ setting.x0 = x0.U * x0.S * x0.V';
         if rankflag ~= 1
             residual = NaN;
         end
-        %checkSVD(xfinal); % added for DEBUG
+        % DEBUG only
+        % checkSVD(xfinal);
         data(1, 1) = residual;
         data(2, 1) = cost;
         data(3, 1) = time;
     end
 
     if specifier.ind(2)
-        %LQH
+        % LQH
         fprintf('Starting LQH \n');
         timetic = tic();
         [xfinal, info, residual] = exactpenaltyViaSmoothinglqh(problem, x0, options);
@@ -227,14 +214,15 @@ setting.x0 = x0.U * x0.S * x0.V';
         if rankflag ~= 1
             residual = NaN;
         end
-        %checkSVD(xfinal); % added for DEBUG
+        % DEBUG only
+        % checkSVD(xfinal);
         data(1, 2) = residual;
         data(2, 2) = cost;
         data(3, 2) = time;
     end
     
     if specifier.ind(3)
-        %LSE
+        % LSE
         fprintf('Starting LSE \n');
         timetic = tic();
         [xfinal, info, residual] = exactpenaltyViaSmoothinglse(problem, x0, options);
@@ -243,7 +231,8 @@ setting.x0 = x0.U * x0.S * x0.V';
         struct2csv(info, filename);        
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         rankflag = check_rank(xfinal);
-        %checkSVD(xfinal); % added for DEBUG
+        % DEBUG only
+        % checkSVD(xfinal);
         if rankflag ~= 1
             residual = NaN;
         end
@@ -265,7 +254,8 @@ setting.x0 = x0.U * x0.S * x0.V';
         if rankflag ~= 1
             residual = NaN;
         end
-        %checkSVD(xfinal); % added for DEBUG
+        % DEBUG only
+        % checkSVD(xfinal);
         data(1, 4) = residual;
         data(2, 4) = cost;
         data(3, 4) = time;

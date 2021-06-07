@@ -11,8 +11,8 @@ x0 = problem.M.rand();
 setting.x0 = x0;
 
 %     DEBUG only
-%     checkgradient(problem);  % OK
-%     checkhessian(problem);  % OK
+%     checkgradient(problem);
+%     checkhessian(problem);
 
 %-------------------------Set-up Constraints-----------------------
 colones = ones(N, 1);
@@ -45,7 +45,7 @@ condet = constraintsdetail(problem);
     options = methodoptions;
     
     if specifier.ind(1)
-        %ALM
+        % ALM
         fprintf('Starting ALM \n');
         timetic = tic();
         [xfinal, info, residual] = almbddmultiplier(problem, x0, options);
@@ -62,7 +62,7 @@ condet = constraintsdetail(problem);
     end
 
     if specifier.ind(2)
-        %LQH
+        % LQH
         fprintf('Starting LQH \n');
         timetic = tic();
         [xfinal, info, residual] = exactpenaltyViaSmoothinglqh(problem, x0, options);
@@ -80,7 +80,7 @@ condet = constraintsdetail(problem);
     
     
     if specifier.ind(3)
-        %LSE
+        % LSE
         fprintf('Starting LSE \n');
         timetic = tic();
         [xfinal, info, residual] = exactpenaltyViaSmoothinglse(problem, x0, options);
@@ -97,7 +97,7 @@ condet = constraintsdetail(problem);
     end
     
     if specifier.ind(4)
-        %FMINCON interior point
+        % FMINCON interior point
         fprintf('Starting fmincon_interior_point \n');
         maxiter = methodoptions.maxOuterIter;
         maxFuniter = 1e+10;        
@@ -137,12 +137,12 @@ condet = constraintsdetail(problem);
         
         xfinal = reshape(xfinal, [rankY, N]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        %data(1, 4) = KKT_residual;  % comment out 0208, 2021
+        % data(1, 4) is blank
         data(2, 4) = cost;
         data(3, 4) = time;
     end
     if specifier.ind(5)
-        %FMINCON sequential quadratic programming
+        % FMINCON sequential quadratic programming
         fprintf('Starting fmincon_SQP \n');
         maxiter = methodoptions.maxOuterIter;
         maxFuniter = 1e+10;        
@@ -182,7 +182,7 @@ condet = constraintsdetail(problem);
         
         xfinal = reshape(xfinal, [rankY, N]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        %data(1, 5) = KKT_residual;  % comment out 0208, 2021
+        % data(1, 5) is blank
         data(2, 5) = cost;
         data(3, 5) = time;
     end     
@@ -282,14 +282,6 @@ condet = constraintsdetail(problem);
         end
     end
 
-    %function val = meanzero_eq_constraint(U)
-    %    val = 2* repmat(U*colones, 1, N);
-    %end
-
-    %function val = hess_meanzero_eq_constraint(U, D)
-    %    val = 2* repmat(D*colones, 1, N);
-    %end
-
     function val = costFun(u)
         val = trace((u) * L * (u.') );
     end
@@ -303,7 +295,7 @@ condet = constraintsdetail(problem);
     end
 
     function manvio = manifoldViolation(x)
-        %Oblique Factory:
+        % Oblique Factory:
         manvio = max(abs(diag(x.'*x)-colones));
     end
 end

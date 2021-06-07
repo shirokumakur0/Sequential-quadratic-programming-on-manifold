@@ -1,5 +1,0 @@
-function printalloutput
-
-    
-
-end

@@ -1,6 +1,6 @@
 function data = clientconstraint_sphere_nonnegativePCA_with_SQP(X, rankY, methodoptions, specifier, setting)
-%Y is a square matrix
-%rank is smaller than columns of Y
+% Y is a square matrix
+% rank is smaller than columns of Y
 [N, ~] = size(X);
 
 data = NaN(3, 6);
@@ -15,7 +15,7 @@ setting.x0 = x0;
 
 %     DEBUG only
 %     checkgradient(problem);
-%     checkhessian(problem); % almost OK
+%     checkhessian(problem); 
 
 %-------------------------Set-up Constraints-----------------------
 constraints_cost = cell(1, N*rankY);
@@ -48,11 +48,11 @@ problem.ineq_constraint_grad = constraints_grad;
 problem.ineq_constraint_hess = constraints_hess;
 
 %     Debug Only
-%     checkconstraints_upto2ndorder(problem) % Okay!
+%     checkconstraints_upto2ndorder(problem)
 
 condet = constraintsdetail(problem);
 
-%     ------------------------- Solving ---------------------------
+%------------------------- Solving ---------------------------
     options = methodoptions;
         
     if specifier.ind(1)
@@ -71,7 +71,7 @@ condet = constraintsdetail(problem);
     end
 
     if specifier.ind(2)
-        %LQH
+        % LQH
         fprintf('Starting LQH \n');
         timetic = tic();
         [xfinal, info, residual] = exactpenaltyViaSmoothinglqh(problem, x0, options);
@@ -87,7 +87,7 @@ condet = constraintsdetail(problem);
     
     
     if specifier.ind(3)
-        %LSE
+        % LSE
         fprintf('Starting LSE \n');
         timetic = tic();
         [xfinal, info, residual] = exactpenaltyViaSmoothinglse(problem, x0, options);
@@ -102,7 +102,7 @@ condet = constraintsdetail(problem);
     end
     
     if specifier.ind(4)
-        %FMINCON Interior point method
+        % FMINCON Interior point method
         fprintf('Starting fmincon_interior_point \n');
         maxiter = methodoptions.maxOuterIter;
         maxFuniter = 1e+10;
@@ -142,13 +142,13 @@ condet = constraintsdetail(problem);
 
         xfinal = reshape(xfinal, [N, rankY]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        data(1, 4) = KKT_residual;
+        % data(1, 4) is blank
         data(2, 4) = cost;
         data(3, 4) = time;
     end
 
     if specifier.ind(5)
-        %FMINCON sequential qudratic programming
+        % FMINCON sequential qudratic programming
         fprintf('Starting fmincon_SQP \n');
         maxiter = methodoptions.maxOuterIter;
         maxFuniter = 1e+10;        
@@ -187,7 +187,7 @@ condet = constraintsdetail(problem);
         
         xfinal = reshape(xfinal, [N, rankY]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        data(1, 5) = KKT_residual;
+        % data(1, 5) is blank
         data(2, 5) = cost;
         data(3, 5) = time;
     end
@@ -284,7 +284,7 @@ condet = constraintsdetail(problem);
     end
 
     function manvio = manifoldViolation(x)
-        %Sphere Factory:
+        % Sphere Factory:
         y = x(:);
         manvio = abs(y.'*y - 1);
     end
