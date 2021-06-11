@@ -97,51 +97,6 @@ condet = constraintsdetail(problem);
     end
     
     if specifier.ind(4)
-        % FMINCON interior point
-        fprintf('Starting fmincon_interior_point \n');
-        maxiter = methodoptions.maxOuterIter;
-        maxFuniter = 1e+10;        
-        fmincontolerance = 0;  % disabling the other stopping conditions.
-        if specifier.matlabversion == 0
-            % Use this if you are at 2015a or older.
-            fminconoptions = optimoptions('fmincon','Algorithm','interior-point', 'MaxIter', maxiter, 'MaxFunEvals', maxFuniter,...
-                'GradObj', 'on', 'GradConstr', 'on', 'OutputFcn', @outfun,...
-                'TolX', fmincontolerance, 'TolCon', fmincontolerance, 'TolFun', fmincontolerance);
-        else
-            % Use this otherwise
-            fminconoptions = optimoptions('fmincon', 'Algorithm', 'interior-point', 'MaxIterations', maxiter, 'MaxFunctionEvaluations', maxFuniter,...
-                'SpecifyObjectiveGradient', true, 'SpecifyConstraintGradient', true, 'OutputFcn', @outfun,...
-                'StepTolerance', fmincontolerance, 'ConstraintTolerance', fmincontolerance, 'OptimalityTolerance', fmincontolerance);
-        end
-        history = struct();
-        history.iter = [];
-        history.cost = [];
-        history.time = [];
-        history.LagGradNorm = [];
-        history.maxviolation = [];
-        history.KKT_residual = [];
-        
-        timetic = tic();
-        [xfinal, fval, exitflag, output] = fmincon(@(v) costFunfmincon(v), x0(:), [], [], [], [], [], [], @nonlcon, fminconoptions);
-        time = toc(timetic);
-        
-        history.iter(1,:) =[];
-        history.cost(1,:) = [];
-        history.time(1,:) = [];
-        history.LagGradNorm(1,:) = [];
-        history.maxviolation(1,:) = [];
-        history.KKT_residual(1,:) = [];
-        
-        filename = sprintf('BC_fmincon_interior_point_nrep%dDim%dDen%.3fTol%d.csv',setting.repeat,setting.dim, setting.density, setting.tolKKTres);
-        struct2csv(history, filename);      
-        
-        xfinal = reshape(xfinal, [rankY, N]);
-        [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        % data(1, 4) is blank
-        data(2, 4) = cost;
-        data(3, 4) = time;
-    end
-    if specifier.ind(5)
         % FMINCON sequential quadratic programming
         fprintf('Starting fmincon_SQP \n');
         maxiter = methodoptions.maxOuterIter;
@@ -182,12 +137,12 @@ condet = constraintsdetail(problem);
         
         xfinal = reshape(xfinal, [rankY, N]);
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
-        % data(1, 5) is blank
-        data(2, 5) = cost;
-        data(3, 5) = time;
+        % data(1, 4) is blank
+        data(2, 4) = cost;
+        data(3, 4) = time;
     end     
     
-    if specifier.ind(6)
+    if specifier.ind(5)
         % Riemannian SQP
         fprintf('Starting Riemannian SQP \n');
         timetic = tic();
@@ -198,9 +153,9 @@ condet = constraintsdetail(problem);
         
         [maxviolation, meanviolation, cost] = evaluation(problem, xfinal, condet);
         maxviolation = max(maxviolation, manifoldViolation(xfinal));
-        data(1, 6) = residual;
-        data(2, 6) = cost;
-        data(3, 6) = time;
+        data(1, 5) = residual;
+        data(2, 5) = cost;
+        data(3, 5) = time;
     end
     
         filename = sprintf('BC_Info_nrep%dDim%dDen%.3fTol%d.csv',setting.repeat,setting.dim, setting.density, setting.tolKKTres);

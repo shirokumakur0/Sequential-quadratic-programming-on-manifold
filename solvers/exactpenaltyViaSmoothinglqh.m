@@ -1,23 +1,24 @@
 function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, options)
-
+    % The following code is based on that on https://github.com/losangle/Optimization-on-manifolds-with-extra-constraints
+    % Symbol # in comments is added on newly added parts or modifications.
+    
     condet = constraintsdetail(problem0);
     
-    %Outer Loop Setting
+    % Outer Loop Setting
     localdefaults.rho = 1;
     localdefaults.thetarho = 0.3;
     localdefaults.maxOuterIter = 300;
     localdefaults.numOuterItertgn = 30;
     localdefaults.startingepsilon = 1e-1;
     localdefaults.endingepsilon = 1e-6;
-    localdefaults.outerverbosity = 1;  % verbosity for outer loops by MO
-    localdefaults.tolKKTres = 1e-8; % a stopping criterion, added by MO
-    localdefaults.minstepsize = 1e-8;  % added by MO
-    %Inner Loop Setting
+    localdefaults.outerverbosity = 1;  % #verbosity for outer loops
+    localdefaults.tolKKTres = 1e-8; % #a stopping criterion
+    localdefaults.minstepsize = 1e-8;  % #
+    % Inner Loop Setting
     localdefaults.maxInnerIter = 200;
     localdefaults.startingtolgradnorm = 1e-3;
     localdefaults.endingtolgradnorm = 1e-6;
-    % For fixed-rank manifolds, rank check at KKT residual
-    localdefaults.rankviopena = 1e+8;
+    localdefaults.rankviopena = 1e+8;  % #rank check in KKT_residual(), only for fixed-rank manifolds
     
     localdefaults = mergeOptions(getGlobalDefaults(), localdefaults);
     if ~exist('options', 'var') || isempty(options)
@@ -25,7 +26,7 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
     end
     options = mergeOptions(localdefaults, options);
 
-    % added for the KKT residual at fixed-rank manifolds 3.31
+    % #For the KKT_residual(), only when considering a fixed-rank manifold
     if contains(problem0.M.name(),'rank')
         if isfield(options, 'rank')
             rankval = options.rank;
@@ -33,7 +34,8 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
             tmpx = problem0.M.rand();
             rankval = rank(tmpx.S);
         end
-    end    
+    end   
+    %
     
     tolgradnorm = options.startingtolgradnorm;
     thetatolgradnorm = nthroot(options.endingtolgradnorm/options.startingtolgradnorm, options.numOuterItertgn);
@@ -45,11 +47,11 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
     epsilon = options.startingepsilon;
     rho = options.rho;
     
-    % for savestats, by MO
+    % #For savestats
     xCurMaxLagMult = maxabsLagrangemultipliers(xCur, problem0, epsilon);
     gradfun = @(X) grad_exactpenalty(X, problem0, rho);
     xCurResidual = KKT_residual();
-    
+    %
     
     OuterIter = 0;
     stats = savestats(x0);
@@ -61,12 +63,13 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
     for OuterIter = 1 : options.maxOuterIter
         timetic = tic();
         
-        % verbosity modified by MO
+        % #Verbosity modified
         if options.outerverbosity >= 2
             fprintf('Iteration: %d    ', OuterIter);
         elseif options.outerverbosity == 1 && mod(OuterIter, 100) == 0 
             fprintf('Iteration: %d    ', OuterIter);
         end
+        %
 
         costfun = @(X) cost_exactpenalty(X, problem0, rho);
         gradfun = @(X) grad_exactpenalty(X, problem0, rho);
@@ -81,15 +84,15 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
         
         [xCur, cost, innerInfo, Oldinneroptions] = rlbfgs(problem, xCur, inneroptions);
         
-        % for savestats, by MO
+        % #For savestats
         xCurMaxLagMult = maxabsLagrangemultipliers(xCur, problem0, epsilon);
         xCurResidual = KKT_residual();
+        %
         
-        % calculating the distance for savestats, by MO
+        % #Calculating the distance for savestats
         if contains(problem0.M.name(),'Stiefel') 
             dist = norm(xCur - xPrev, 'fro');
-        elseif contains(problem0.M.name(),'rank')
-            % Only assuming for 'fixedrankembeddedfactory'
+        elseif contains(problem0.M.name(),'rank')  % #only for 'fixedrankembeddedfactory'
             if ~exist('xCurmat', 'var')
                 xCurmat = xCur.U * xCur.S * xCur.V';
             end    
@@ -99,37 +102,42 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
         else
             dist = problem0.M.dist(xCur, xPrev);
         end
+        %
         
-        %Save stats
+        % Save stats
         stats = savestats(xCur);
         info(OuterIter+1) = stats;
         
-        % According to the convergence theory. Liu and Boumal, 2019
+        % #According to Proposition 4.2 in [Liu and Boumal, 2019], we turn
+        % off the following update.
         %if stats.maxviolation > epsilon
         %    rho = rho/options.thetarho;
         %end
+        %
         
-        % updating judge for exit, added by MO
+        % #Update check
         oldeps = epsilon;
         oldtolgradnorm = tolgradnorm;
+        %
         
         epsilon  = max(options.endingepsilon, theta_epsilon * epsilon);
         tolgradnorm = max(options.endingtolgradnorm, tolgradnorm * thetatolgradnorm);
         
-        % verbosity modified by MO
+        % #Verbosity modified
         if options.outerverbosity >= 2
             fprintf('KKT Residual: %.16e\n', xCurResidual)
         elseif options.outerverbosity == 1 && mod(OuterIter, 100) == 0 
             fprintf('KKT Residual: %.16e\n', xCurResidual)
         end
+        %
         
-        % This is the stopping criterion based on violation_sum by MO
+        % #Stopping criteria
         if xCurResidual < options.tolKKTres && tolgradnorm <= options.endingtolgradnorm
             fprintf("KKT residual tolerance reached\n")
             break;
-        elseif dist == 0 && (epsilon == oldeps) && (tolgradnorm == oldtolgradnorm)
+        elseif dist == 0 && (epsilon == oldeps) && (tolgradnorm == oldtolgradnorm)  % #nothing changed, meaning that the alg. keeps producing the same point hereafter.
             fprintf("Any parameter did not change\n")
-            break; % because nothing changed, meaning that the alg. keeps producing the same point hereafter.
+            break; 
         end
         
         xPrev = xCur;
@@ -142,7 +150,7 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
     
     info = info(1: OuterIter+1);
     
-    residual  = KKT_residual(); % added by MO    
+    residual  = KKT_residual(); % #
     
     xfinal = xCur;
     
@@ -150,18 +158,19 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
         stats.iter = OuterIter;
         if stats.iter == 0
             stats.time = 0;
-            stats.dist = NaN; % by MO
+            stats.dist = NaN; % #
         else
             stats.time = info(OuterIter).time + toc(timetic);
-            stats.dist = dist; % by MO
+            stats.dist = dist; % #
         end
         [maxviolation, meanviolation, costCur] = evaluation(problem0, x, condet);
         stats.maxviolation = maxviolation;
         stats.meanviolation = meanviolation;
         stats.cost = costCur;
-        % adding the information on Lagrange multipliers by MO
-        stats.maxabsLagMult = xCurMaxLagMult;  % added by MO
-        stats.KKT_residual = xCurResidual;  % added by MO
+        % #Information on Lagrange multipliers and KKT residual
+        stats.maxabsLagMult = xCurMaxLagMult;  
+        stats.KKT_residual = xCurResidual;
+        %
     end
     
 
@@ -182,7 +191,7 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
                 val = val + rho*cost_at_x;
             end
         end
-        %Eq constratint cost
+        % Eq constratint cost
         if condet.has_eq_cost
             for numeq = 1 : condet.n_eq_constraint_cost
                 costhandle = problem.eq_constraint_cost{numeq};
@@ -224,9 +233,8 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
         end
     end
 
-    % Added by MO
+    % #Computing KKT residual at the current iterate
     function val = KKT_residual()
-        %grad = gradLag(xCur, problem0, epsilon);
         grad = gradfun(xCur);
         val = problem0.M.norm(xCur, grad)^2;
         manpowvio = manifoldPowerViolation(xCur);
@@ -250,8 +258,7 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
         end
         val = sqrt(val);
         
-        % check if the current point satisfies the rank const. alternative
-        % role as manvio at fixed-rank manifolds
+        % #Check whether the current point satisfies the rank const. or not. 
         if contains(problem0.M.name(),'rank')
             xCurMatRank = xCur.U * xCur.S * xCur.V';
             xCurrank = rank(xCurMatRank);
@@ -262,6 +269,7 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
         
     end
     
+    % #Calculating the violation on the complementary condition
     function compowvio = complementaryPowerViolation(x, problem, u)
         compowvio = 0;
         if condet.has_ineq_cost
@@ -281,43 +289,9 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
         end
     end
 
-    % Added by MO but not needed (because we have grad_exactpenalty)
-    function val = gradLag(x, problem, u)
-        val = getGradient(problem, x);
-        if condet.has_ineq_cost
-            for numineq = 1: condet.n_ineq_constraint_cost
-                costhandle = problem.ineq_constraint_cost{numineq};            
-                cost_at_x = costhandle(x);
-                gradhandle = problem.ineq_constraint_grad{numineq};
-                constraint_grad = gradhandle(x);
-                constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-                if cost_at_x <= 0
-                    lambda = 0;
-                elseif cost_at_x <= u
-                    lambda = cost_at_x / u;
-                    val = problem.M.lincomb(x, 1, val, rho * lambda, constraint_grad);
-                else
-                    lambda = 1;
-                    val = problem.M.lincomb(x, 1, val, rho * lambda, constraint_grad);
-                end
-            end
-        end
-        if condet.has_eq_cost
-            for numineq = 1: condet.n_eq_constraint_cost
-                costhandle = problem.eq_constraint_cost{numineq};            
-                cost_at_x = costhandle(x);
-                gradhandle = problem.eq_constraint_grad{numineq};
-                constraint_grad = gradhandle(x);
-                constraint_grad = problem.M.egrad2rgrad(x, constraint_grad);
-                gamma = cost_at_x / sqrt(cost_at_x^2 + u^2);
-                val = problem.M.lincomb(x, 1, val, rho * gamma, constraint_grad);
-            end 
-        end
-    end
-
-    % Added by MO
+    % #Computing the maximum among the absolute values of Lagrange multiplies.
     function val = maxabsLagrangemultipliers(x, problem, u)
-        val = -1; % meaning no constraints
+        val = -1; % #meaning no constraints
         if condet.has_ineq_cost
             for numineq = 1: condet.n_ineq_constraint_cost
                 costhandle = problem.ineq_constraint_cost{numineq};            
@@ -342,9 +316,9 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
         end
     end
 
-    % added by MO, for calculating KKT residual
+    % #Computing manifold violation
     function manvio = manifoldPowerViolation(xCur)
-        % According to the type of manifold, calculate the violation from
+        % #According to the type of manifold, calculate the violation from
         % constraints seen as the manifold.
         manvio = 0;
         if contains(problem0.M.name(),'Sphere')         
@@ -355,7 +329,7 @@ function [xfinal,info, residual] = exactpenaltyViaSmoothinglqh (problem0, x0, op
             for i = 1:N
                 manvio = manvio + abs(xCur(:,i).' * xCur(:,i) - 1)^2;
             end
-        else % including fixed-rank manifolds
+        else % #including fixed-rank manifolds
             manvio = 0;
         end
     end

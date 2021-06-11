@@ -1,51 +1,153 @@
-function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, options)
+function [xfinal, costfinal, residual, info, options] = SQP(problem0, x0, options)
 % Sequential Quadratic Programming solver for smooth objective functions 
 % on Riemannian manifolds.
 %
-% function [x, cost, info, options] = sqponmani(problem0)
-% function [x, cost, info, options] = sqponmani(problem0, x0)
-% function [x, cost, info, options] = sqponmani(problem0, x0, options)
-% function [x, cost, info, options] = sqponmani(problem0, [], options)
+% function [xfinal, costfinal, residual, info, options] = sqponmani(problem0)
+% function [xfinal, costfinal, residual, info, options] = sqponmani(problem0, x0)
+% function [xfinal, costfinal, residual, info, options] = sqponmani(problem0, x0, options)
+% function [xfinal, costfinal, residual, info, options] = sqponmani(problem0, [], options)
 %
-% This is a Sequential Qudratic Programming solver for mixed constraints problems
+% This is a Sequential Qudratic Programming solver for nonlinear optimization problems
 % on Riemannian manifolds, which aims to minimize the cost function
 % in the given problem structure with (in)equality constraints.
 % It requires access to the gradient and the Hessian of the cost function
 % and the constraints.
 %
 % For a description of the algorithm and theorems offering convergence
-% guarantees, see the references below.
+% guarantees, see the references below:
+%   M.Obara, T. Okuno, and A. Takeda. Sequential quadratic optimization for nonlinear optimization problems
+%   on Riemannian manifolds, https://arxiv.org/abs/2009.07153.
 %
 % The initial iterate is x0 if it is provided. Otherwise, a random point on
 % the manifold is picked. To specify options whilst not specifying an
 % initial iterate, give x0 as [] (the empty matrix).
 %
-% The two outputs 'x' and 'cost' are the last reached point on the manifold
-% and its cost. 
+% The two outputs 'xfinal', 'costfinal', 'residual' are the last reached point on the manifold,
+% its cost, and its KKT residual.
 % 
 % The output 'info' is a struct-array which contains information about the
 % iterations:
-%            LATER!
+%   iter (integer)
+%       The (outer) iteration number, i.e., number of steps considered
+%       so far. The initial guess is 0.
+%   cost (double)
+%       The corresponding cost value
+%   gradnorm (double)
+%       The (Riemannian) norm of the gradient of the Lagrangian
+%   time (double)
+%       The total elapsed time in seconds to reach the corresponding cost
+%   stepsize (double, <=1)
+%       The size of the steplength determined by the backtracking
+%       linesearch
+%   ls_max_steps_break (boolean)
+%       Whether the linesearch ends due to the excess of the maximal number
+%       of the backtracking (ls_max_steps):
+%           0: the backtracking ends normally 
+%           1: the backtracking ends due to the excess of the number
+%   dist (double)
+%       The (Riemannian) distance between the previous and the new iterates
+%   qpexitflag (integer)
+%       Reason quadprog stopped, returned as an integer. It should be 1:
+%           1: Function converged to the solution x.
+%           0: Number of iterations exceeded options.MaxIterations.
+%           -2: Problem is infeasible. Or, for 'interior-point-convex', the
+%               step size was smaller than options.StepTolerance, but 
+%               constraints were not satisfied.
+%           2: Step size was smaller than options.StepTolerance, 
+%               constraints were satisfied. (only when using
+%               'interior-point-convex')
+%           -6: Nonconvex problem detected. (only when using 'interior-point-convex')
+%           -8: Unable to compute a step direction. (only when 'interior-point-convex')
+%       (Cf.: https://www.mathworks.com/help/optim/ug/quadprog.html#d123e131181)
+%   rho (double)
+%       The penalty parameter for the ell-1 penalty function
+%   KKT_residual (double)
+%       The sum of the residual of the KKT conditions
+%   maxviolation (double)
+%       The maximal value of the violations of (in)equality constraints
+%   meanviolation (double)
+%       The mean value of the violations of (in)equality constraints
 %
 % For example, type [info.gradnorm] to obtain a vector of the successive
-% gradient norms reached at each iteration.
+% the norms of the gradient of the Lagrangian reached at each iteration.
 %
 % The options structure is used to overwrite the default values. All
 % options have a default value and are hence optional. To force an option
 % value, pass an options structure with a field options.optionname, where
 % optionname is one of the following and the default value is indicated
 % between parentheses:
-%                     LATER!
-%
+%   maxiter (300)
+%       The algorithm terminates if maxiter (outer) iterations have been
+%       executed.
+%   maxtime (3600)
+%       The algorithm terminates if maxtime seconds elapsed.
+%   tolKKTres (1e-8)
+%       The algorithm terminates if the KKT residual drops below this.
+%   modify_hessian ('mineigval_matlab')
+%       The algorithm sets the linear operators on subproblems in the
+%       following manner:
+%           'eye': the identity matrix,
+%           'mineigval_matlab': a regularized Hessian of the Lagrangian.
+%           We regularize the Hessian matrix if it is not positive-definite
+%           by replacing negative engenvalues with positive epsilon,
+%           'mineigval_manopt' (default): a regularized Hessian of the Lagrangian.
+%           We regularize the Hessian matrix if it is not positive-definite
+%           by adding the absolute value of the minimal eigenvalue and an 
+%           positive epsilon to the diagonal elements in the matrix. We get
+%           the eigenvalue by solving the Rayleigh quotient minization.
+%   mineigval_correction (1e-8)
+%       The algorithm adds this value for the linear matrix on the
+%       subproblem to be positive-definite when using 'mineigval_matlab' or
+%       'mineigval_manopt' procedures.
+%   mineigval_threshold (1e-3)
+%       Threshold value used in correcting the diagonal
+%       elements by 'mineigval_manopt'. If the corrected elements is lower
+%       than this value, we further modify the value to attain the
+%       threshold.
+%   tau (0.5)
+%       Constant for updating the penalty parameter. The value
+%       must be positive.
+%   rho (1)
+%       Initial penarty parameter for the ell-1 penalty
+%       function. The value must be positive.
+%   beta (0.9)
+%       Magnification of the backtracking to find an appropriate
+%       steplength. The value must belong to the interval (0, 1).
+%   gamma (0.25)
+%       Constant for the backtracking line search. The value
+%       must belong to the interval (0, 1).
+%   mus (ones)
+%       Initial Lagrange multiplier vector for inequlity constraints.
+%   lambdas (ones)
+%       Initial Lagrange multiplier vector for equlity constraints.
+%   ls_max_steps (10000)
+%       The algorithm breaks the backtracking if the ls_max_steps trial
+%       have been executed.
+%   ls_threshold (1e-8)
+%       The algorithm finishes the line search if a steplength satisfies 
+%       the condition with the tolerance of this threshold.
+%   verbosity (1)
+%       Integer number used to tune the amount and the frequency of output 
+%       the algorithm generates during execution (mostly as text in the 
+%       command window). The higher, the more output. 0 means silent.
+%   qp_verbosity (0)
+%       Integer number used to tune the amount and the frequency of output 
+%       the algorithm generates during execution of the quadratic optimization
+%       subproblems (mostly as text in the command window). The higher, the
+%       more output. 0 means silent.
+%   --
+%   rankviopena (1e+8)
+%       If considering optimization on fixed-rank manifolds, the value is
+%       used as the penalty when violating the fixed-rank constraints.
+%       Note: the procedures to check the satisfiablity of manifold constraints 
+%           should be moved to outside of the solver.
 %
 % Original author: Mitsuaki Obara, January 20, 2020.
 % Contributors: 
 % Change log: 
-%           February, 8, 2021: Minor cleaning (just deleted unnecessary comments)
-%
-%           January, 20, 2020: forked from Changshuo Liu's rlbfgs.m
-%           deleted codes on localdefaults.tolgradnorm and 
-%           localdefaults.strict_inc_func 
+%           June, 7, 2021: Clean the code (just delete the comments) and
+%           add the new introduction.
+%           January, 20, 2020: Write the code.
 
     % % Verify that the problem description is sufficient for the solver.
     % if ~canGetCost(problem0)
@@ -67,17 +169,16 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
     
     % Set localdefaults, a struct to be combined with argument options for
     % declaring hyperparameters.
-    % For stopping criteria
+    
+    % Stopping criteria
     localdefaults.maxiter = 300;
     localdefaults.maxtime = 3600;
     localdefaults.tolKKTres = 1e-8;
-    %localdefaults.tolgradnorm = 1e-8;
-    %localdefaults.toliterdist = 1e-8;
-    % For StoreDB
-    % localdefaults.storedepth = 3;
-    % For modification for the hessian matrix to be positive semidefinete.
+    % StoreDB (TODO: implement)
+    %   localdefaults.storedepth = 3;
+    % Regularization of the hessian matrix to be positive-definete.
     localdefaults.modify_hessian = 'mineigval_matlab';
-    localdefaults.mineigval_correction = 1e-8; % the param for mineigval_manopt or _matlab
+    localdefaults.mineigval_correction = 1e-8; 
     localdefaults.mineigval_threshold = 1e-3;
     % Initial parameters for the merit function and the Lagrangian
     localdefaults.tau = 0.5;  % as long as tau > 0
@@ -86,14 +187,13 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
     localdefaults.gamma = 0.25; % as long as 1 > gamma > 0  
     localdefaults.mus = ones(condet.n_ineq_constraint_cost, 1);
     localdefaults.lambdas = ones(condet.n_eq_constraint_cost, 1);    
-    % For linesearch
-    % localdeafults.escapeswitch = 0;
+    % Linesearch
     localdefaults.ls_max_steps  = 10000;
     localdefaults.ls_threshold = 1e-8;
-    % For display
+    % Display
     localdefaults.verbosity = 1;
     localdefaults.qp_verbosity = 0;
-    % For fixed-rank manifolds, rank check at KKT residual
+    % Only when using fixed-rank manifolds
     localdefaults.rankviopena = 1e+8;
     
     % Merge global and local defaults, then merge w/ user options, if any.
@@ -117,7 +217,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         xCur = x0;
     end
     
-    % added for the KKT residual at fixed-rank manifolds 3.31
+    % Only for calculating the KKT residual on fixed-rank manifolds 
     if contains(problem0.M.name(),'rank')
         if isfield(options, 'rank')
             rankval = options.rank;
@@ -127,17 +227,17 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         end
     end
     
-    % Create a store database and get a key for the current x
+    % Create a store database and get a key for the current x (TODO)
     %storedb = StoreDB(options.storedepth);
     %key = storedb.getNewKey();
     
     % Create some initial variables which will be used in the following
     % loop.
-    mus = options.mus; % Init. mus and lambdas for the Lagrangian
+    mus = options.mus;  % init. mus and lambdas for the Lagrangian
     lambdas = options.lambdas;
-    rho = options.rho; % Init. rho for merit function
+    rho = options.rho;  % init. rho for merit function
     
-    % For the initial savestats, declare some variables
+    % Declare some variables for the initial savestats
     iter = 0;
     xCurCost = getCost(problem0, xCur);
     xCurLagGrad = gradLagrangian(xCur, mus, lambdas);
@@ -151,7 +251,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
     info(1) = stats;
     info(min(10000, options.maxiter+1)).iter = [];
     
-    % Stop flag, finally it should be true
+    % Stopping flag, finally it should be true
     stop = false;
     totaltime = tic();
     
@@ -168,35 +268,31 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         iter = iter + 1;
         timetic = tic();
 
-        % update flag for a stopping criterion
+        % Flags about updating parameters for a stopping criterion
         updateflag_rho = false;
         updateflag_Lagmult = false;
         
         % Get current Hessian and gradient of the cost function.
         % Also, make a "qpinfo" structure stading for the subproblem
         % at the current point.
-        
         costLag = @(X) costLagrangian(X, mus, lambdas);
         gradLag = @(X) gradLagrangian(X, mus, lambdas); % in the tangent space
         hessLag = @(X, d) hessLagrangian(X, d, mus, lambdas); % in the tangent space
-
         auxproblem.M = problem0.M;
         auxproblem.cost = costLag;
         auxproblem.grad = gradLag;
         auxproblem.hess = hessLag;
         qpinfo = struct();
 
-        % Make H, basis, and n and also, if needed,
-        % modify qpinfo.H (Hessian matrix) to be positive definite somehow.
-        % The difference between mineiegval_matlab and mineigval_manopt is
-        % correct negative eigenvalues respectively or altogther.
+        % Make H, basis, and n and modify H to be positive-definite in a 
+        % predescribed manner when necessary.
+        % (The difference between mineiegval_matlab and mineigval_manopt is
+        % correct negative eigenvalues respectively or altogther.)
         if strcmp(options.modify_hessian, "eye")
             qpinfo.basis = tangentorthobasis(auxproblem.M, xCur, auxproblem.M.dim());
             qpinfo.n = numel(qpinfo.basis);
-            % The identity matrix as replacement to Hessian.
-            qpinfo.H = eye(qpinfo.n);
+            qpinfo.H = eye(qpinfo.n);  % the identity matrix as replacement to Hessian.
         elseif strcmp(options.modify_hessian, 'mineigval_matlab') 
-            % The eigenvalue decomposition function on matlab
             [qpinfo.H, qpinfo.basis] = hessianmatrix(auxproblem, xCur);
             qpinfo.n = numel(qpinfo.basis);
             [U,T] = schur(qpinfo.H);
@@ -209,7 +305,6 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         elseif strcmp(options.modify_hessian, 'mineigval_manopt')
             [qpinfo.H, qpinfo.basis] = hessianmatrix(auxproblem, xCur);
             qpinfo.n = numel(qpinfo.basis);
-            % Rayleigh quotient minization to get get a minimum eigenvalue.
             [~ ,qpinfo.mineigval] = hessianextreme(auxproblem, xCur);
             if qpinfo.mineigval < 0
                 qpinfo.mineigval_diagcoeff = max(options.mineigval_threshold,...
@@ -217,7 +312,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
                 qpinfo.H = qpinfo.H + qpinfo.mineigval_diagcoeff * eye(qpinfo.n);
             end
         else
-            [qpinfo.H,qpinfo.basis] = hessianmatrix(auxproblem, xCur);
+            [qpinfo.H,qpinfo.basis] = hessianmatrix(auxproblem, xCur);  % may not be positive-definite
             qpinfo.n = numel(qpinfo.basis);
         end
         qpinfo.H = 0.5 * (qpinfo.H.'+qpinfo.H);
@@ -230,7 +325,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         end
         qpinfo.f = f;
 
-        % make inequality constraints
+        % Make inequality constraints
         if condet.has_ineq_cost
             row = condet.n_ineq_constraint_cost;
             col = qpinfo.n;
@@ -254,7 +349,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         qpinfo.A = A;
         qpinfo.b = b;
 
-        % make equality constraints
+        % Make equality constraints
         if condet.has_eq_cost
             row = condet.n_eq_constraint_cost;
             col = qpinfo.n;
@@ -278,8 +373,8 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         qpinfo.Aeq = Aeq;
         qpinfo.beq = beq;
 
-        % Compute the direction and Lagrange multipliers
-        % by solving QP with quadprog, a matlab solver for QP
+        % Compute the direction and Lagrange multipliers by solving QP with
+        % quadprog, a matlab solver for QP.
         [coeff, ~, qpexitflag, ~, Lagmultipliers] = quadprog(qpinfo.H, qpinfo.f,...
                 qpinfo.A, qpinfo.b, qpinfo.Aeq, qpinfo.beq, [], [], [], qpoptions);     
 
@@ -288,7 +383,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
             deltaXast = problem0.M.lincomb(xCur, 1, deltaXast, coeff(i), qpinfo.basis{i});
         end
         
-        % Update rho, a penalty parameter, if needed.
+        % Update rho, a penalty parameter, if necessary.
         newacc = rho;
         if condet.has_ineq_cost
             for iterineq = 1 : condet.n_ineq_constraint_cost
@@ -305,7 +400,8 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
            updateflag_rho = true;
         end
         
-        % Compute a problem and some variables for loneArmijoLineSearch
+        % Comnstruct a problem structure and some variables for the line
+        % search.
         meritproblem.M = problem0.M;
         meritproblem.cost = @(x) loneMeritFunction(x, rho);
         f0 = meritproblem.cost(xCur);
@@ -313,19 +409,19 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         % Compute df0 according to options.modify_hessian
         df0 = (coeff.') * (qpinfo.H) * (coeff);
 
-        % Compute the stepsize with the L1-type merit function and the Armijo rule
+        % Compute the stepsize with the ell-1 type merit function and the Armijo rule
         stepsize = 1;
         newx = meritproblem.M.retr(xCur, deltaXast, stepsize);
         newf = meritproblem.cost(newx);
         gammadf0 = df0 * options.gamma;
-        r = 0; % back-tracking counter
+        r = 0; % backtracking counter
         ls_max_steps_flag = false;
         
         % DEBUG only
         % descriptCost(meritproblem, xCur, deltaXast);
         
         while newf > ( f0 - gammadf0) && abs(newf - ( f0 - gammadf0)) > options.ls_threshold
-            if r > options.ls_max_steps % || stepsize < 1e-10
+            if r > options.ls_max_steps
                 ls_max_steps_flag = true;
                 break;
             end
@@ -336,7 +432,8 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
             newf = meritproblem.cost(newx);
         end
         
-        % For savestats
+        % Information for savestats (TODO: the procedure should be out of
+        % the solver because the distance calculation depends on manifolds.)
         if contains(problem0.M.name(),'Stiefel') 
             dist = norm(xCur - newx, 'fro');
         elseif contains(problem0.M.name(),'rank')
@@ -361,19 +458,19 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         mus = Lagmultipliers.ineqlin;
         lambdas =  Lagmultipliers.eqlin;
         
-        % For savestats (Cont'd)
+        % Information for savestats (Cont'd)
         xCurCost = getCost(problem0, xCur);
         xCurLagGrad = gradLagrangian(xCur, mus, lambdas);
         xCurLagGradNorm = problem0.M.norm(xCur, xCurLagGrad);        
         xCurResidual = KKT_residual(xCur, mus, lambdas);
         [xCurMaxViolation, xCurMeanViolation] = const_evaluation(xCur);
         
-        % savestats
+        % Savestats
         %key = storedb.getNewKey();
         stats = savestats();
         info(iter+1) = stats;
         
-        % refer to stop criteria        
+        % Refer to stopping criteria        
         if iter >= options.maxiter
             fprintf('Max iter count reached\n');
             options.reason = "Max iter count reached";
@@ -546,7 +643,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         end
     end
     
-    % For additiobal stats
+    % Calculating the KKT residual at (XCur, mus, lambdas)
     function val = KKT_residual(xCur, mus, lambdas)
         xGrad = gradLagrangian(xCur, mus, lambdas);
         val = problem0.M.norm(xCur, xGrad)^2;
@@ -576,8 +673,7 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
         end        
         val = sqrt(val);
         
-        % check if the current point satisfies the rank const. alternative
-        % role as manvio at fixed-rank manifolds
+        % Check for KKT_residual(), only when considering a fixed-rank manifold
         if contains(problem0.M.name(),'rank')
             xCurMatRank = xCur.U * xCur.S * xCur.V';
             xCurrank = rank(xCurMatRank);
@@ -611,7 +707,9 @@ function [xfinal, costfinal, residual,  info, options] = SQP(problem0, x0, optio
     end
     function manvio = manifoldPowerViolation(xCur)
         % According to the type of manifold, calculate the violation from
-        % constraints seen as the manifold.
+        % constraints seen as the manifold. (NOTE: the procedure should be
+        % out of the solver because the calculation depends on the choice 
+        % of the manifold.)
         manvio = 0;
         if contains(problem0.M.name(),'Sphere')         
             y = xCur(:);

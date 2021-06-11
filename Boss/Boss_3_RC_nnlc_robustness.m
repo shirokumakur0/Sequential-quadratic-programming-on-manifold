@@ -51,7 +51,7 @@ for repeat = 1 : n_repeat
                         %________Experiment_____
                         options.maxOuterIter = 100000;  % for Riemannian methods
                         options.maxiter = options.maxOuterIter;  % for RSQO (RSQP)
-                        options.maxtime = 60;  % 60
+                        options.maxtime = 1;  % 60
                         options.verbosity = 1;  % 1
                         options.tolKKTres = 10^(-tolKKTres);     
                         options.startingtolgradnorm = max(1e-3, 10^(-tolKKTres + 3));
@@ -87,8 +87,8 @@ for repeat = 1 : n_repeat
                         outputdata = [result; param]';
 
                         % Performance profile
-                        filename = sprintf('with_SQP_zz_RC_nnlc_%s.dat', setting.filepath);
-                        dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
+                        % filename = sprintf('with_SQP_zz_RC_nnlc_%s.dat', setting.filepath);
+                        % dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
                     end
                 end
             end

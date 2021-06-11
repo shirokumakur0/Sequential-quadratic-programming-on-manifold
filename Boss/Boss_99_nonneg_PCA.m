@@ -63,8 +63,8 @@ for repeat = 1: n_repeat
                     outputdata = [result; param]';
 
                     % Performance profile according to dimension and tolKKTres
-                    filename = sprintf('with_SQP_zz_NNPCA_Dim%dTol%d.dat', dim, tolKKTres);
-                    dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
+                    % filename = sprintf('with_SQP_zz_NNPCA_Dim%dTol%d.dat', dim, tolKKTres);
+                    % dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
                 end
             end
         end

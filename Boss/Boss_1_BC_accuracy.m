@@ -44,7 +44,7 @@ for repeat = 1 : n_repeat
                 setting.maxtime = options.maxtime;
                 setting.L = L;
 
-                specifier.ind = [1,1,1,1,1,1];  % [1,1,1,1,1,1]
+                specifier.ind = [1,1,1,1,1];  % [1,1,1,1,1]
                 
                 result = clientconstraint_oblique_balancedcut(L, rank, options, specifier, setting);
                 result = result(:);
@@ -52,8 +52,8 @@ for repeat = 1 : n_repeat
                 outputdata = [result; param]';
                 
                 % Performance profile according to dimension and residual
-                filename = sprintf('with_SQP_zz_BC_Dim%dTol%d.dat', dim,tolKKTres);
-                dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
+                % filename = sprintf('with_SQP_zz_BC_Dim%dTol%d.dat', dim,tolKKTres);
+                % dlmwrite(filename, outputdata, 'delimiter', ',', 'precision', 16, '-append');
                 
             end
         end
